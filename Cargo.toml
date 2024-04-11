@@ -31,4 +31,5 @@ members = [
     "symmetric",
     "util",
     "uni-stark",
+    "sha256",
 ]

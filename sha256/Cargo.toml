@@ -1,0 +1,17 @@
+[package]
+name = "sha256"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+
+
+[dependencies]
+bitcoin-script = { git = "https://github.com/cyl19970726/rust-bitcoin-script"}
+bitcoin = { git = "https://github.com/cyl19970726/rust-bitcoin", branch = "merge" }
+bitcoin-scriptexec = { git = "https://github.com/cyl19970726/rust-bitcoin-scriptexec/" }
+
+p3-symmetric = { path = "../symmetric" }
+bitcoin_hashes= "0.13.0"
+[dev-dependencies]
+
