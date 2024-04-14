@@ -1,0 +1,54 @@
+[package]
+name = "bf-scripts"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bitcoin-script = { git = "https://github.com/cyl19970726/rust-bitcoin-script", branch = "script_macro" }
+bitcoin = { git = "https://github.com/cyl19970726/rust-bitcoin", branch = "merge" }
+bitcoin-scriptexec = { git = "https://github.com/cyl19970726/rust-bitcoin-scriptexec" }
+
+rand_chacha = "0.3.1"
+rand = "0.8.5"
+p3-field = { path = "../field" }
+p3-baby-bear = { path = "../baby-bear" }
+# p3-baby-bear = { git = "https://github.com/Plonky3/Plonky3" }
+# p3-field = { git = "https://github.com/Plonky3/Plonky3" }
+# p3-mersenne-31 = { git = "https://github.com/Plonky3/Plonky3" }
+hex = "0.4.3"
+[dev-dependencies]
+p3-dft = { path = "../dft" }
+p3-goldilocks = { path = "../goldilocks" }
+p3-mersenne-31 = { path = "../mersenne-31" }
+p3-mds = { path = "../mds" }
+p3-merkle-tree = { path = "../merkle-tree" }
+p3-poseidon2 = { path = "../poseidon2" }
+p3-symmetric = { path = "../symmetric" }
+criterion = "0.5.1"
+rand = "0.8.5"
+rand_chacha = "0.3.1"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+incremental = true
+panic = 'abort'
+
+[profile.bench]
+opt-level = 3
+debug = false
+rpath = false
+lto = "thin"
+incremental = true
+debug-assertions = false
+
+[profile.dev]
+opt-level = 3
+panic = 'abort'
+
+[profile.test]
+opt-level = 3
+lto = "thin"
+incremental = true
+debug-assertions = true
+debug = true
