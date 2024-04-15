@@ -1,18 +1,12 @@
+use alloc::vec::Vec;
 use core::marker::PhantomData;
 
-use alloc::vec::Vec;
 use bf_scripts::field::BabyBear;
-use bf_scripts::{execute_script, leaf};
-use bf_scripts::{EvaluationLeaf, NativeField};
-use bitcoin::taproot::NodeInfo;
-use bitcoin::{
-    taproot::LeafVersion::TapScript, taproot::TapLeaf, taproot::TapTree, taproot::TaprootBuilder,
-    taproot::TaprootBuilderError, ScriptBuf,
-};
-
-use p3_field::AbstractField;
-use p3_field::TwoAdicField;
-use p3_field::{PrimeField, PrimeField32};
+use bf_scripts::{execute_script, leaf, EvaluationLeaf, NativeField};
+use bitcoin::taproot::LeafVersion::TapScript;
+use bitcoin::taproot::{NodeInfo, TapLeaf, TapTree, TaprootBuilder, TaprootBuilderError};
+use bitcoin::ScriptBuf;
+use p3_field::{AbstractField, PrimeField, PrimeField32, TwoAdicField};
 use p3_util::log2_strict_usize;
 
 #[derive(Debug)]
@@ -42,7 +36,7 @@ pub struct FieldTapTreeMMCS<const TREE_HEIGHT: u8, F: NativeField> {
     phantom: PhantomData<F>,
 }
 
-pub fn construct_evaluation_leaf_script<const NUM_POLY: usize,F:NativeField>(
+pub fn construct_evaluation_leaf_script<const NUM_POLY: usize, F: NativeField>(
     leaf_index: usize,
     x: F,
     y_s: Vec<F>,
@@ -66,7 +60,6 @@ impl<const TREE_HEIGHT: u8, F: NativeField> FieldTapTreeMMCS<TREE_HEIGHT, F> {
         Ok(self)
     }
 
-
     pub fn into_node_info(self) -> NodeInfo {
         self.builder.try_into_node_info().unwrap()
     }
@@ -74,7 +67,6 @@ impl<const TREE_HEIGHT: u8, F: NativeField> FieldTapTreeMMCS<TREE_HEIGHT, F> {
     pub fn into_taptree(self) -> TapTree {
         self.builder.try_into_taptree().unwrap()
     }
-
 }
 #[derive(PartialEq)]
 enum PolynomialType {
@@ -133,13 +125,13 @@ impl<F: NativeField> Polynomials<F> {
 
 mod tests {
 
-    use super::*;
-
     use alloc::vec;
 
     use p3_field::AbstractField;
     use p3_interpolation::interpolate_subgroup;
     use p3_matrix::dense::RowMajorMatrix;
+
+    use super::*;
 
     #[test]
     fn test_interpolate_subgroup() {
@@ -168,13 +160,13 @@ mod tests {
         let mut field_taptree_1 = FieldTapTreeMMCS::<3, BabyBear>::new();
 
         for i in 0..evas1.len() {
-            let leaf_script = construct_evaluation_leaf_script::<1,F>(
-                    i,
-                    eva_poly1.points[i],
-                    vec![evas1[i].clone()],
-                )
-                .unwrap();
-            field_taptree_1= field_taptree_1.add_leaf(leaf_script).unwrap();
+            let leaf_script = construct_evaluation_leaf_script::<1, F>(
+                i,
+                eva_poly1.points[i],
+                vec![evas1[i].clone()],
+            )
+            .unwrap();
+            field_taptree_1 = field_taptree_1.add_leaf(leaf_script).unwrap();
         }
 
         let coeffs2: Vec<BabyBear> = vec![
@@ -191,17 +183,19 @@ mod tests {
         let mut field_taptree_2 = FieldTapTreeMMCS::<3, BabyBear>::new();
 
         for i in 0..evas2.len() {
-            let leaf_script = construct_evaluation_leaf_script::<1,F>(
-                    i,
-                    eva_poly2.points[i],
-                    vec![evas2[i].clone()],
-                )
-                .unwrap();
-            field_taptree_2= field_taptree_2.add_leaf(leaf_script).unwrap();
+            let leaf_script = construct_evaluation_leaf_script::<1, F>(
+                i,
+                eva_poly2.points[i],
+                vec![evas2[i].clone()],
+            )
+            .unwrap();
+            field_taptree_2 = field_taptree_2.add_leaf(leaf_script).unwrap();
         }
 
-        let new_node = combine_two_nodes(field_taptree_1.clone().into_node_info(), field_taptree_2.clone().into_node_info()).unwrap();
-
+        let new_node = combine_two_nodes(
+            field_taptree_1.clone().into_node_info(),
+            field_taptree_2.clone().into_node_info(),
+        )
+        .unwrap();
     }
-
 }

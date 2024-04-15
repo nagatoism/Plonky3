@@ -1,6 +1,7 @@
 use bitcoin::blockdata::transaction;
 use bitcoin::blockdata::transaction::Transaction;
-use bitcoin::{hashes::Hash, TapLeafHash, Transaction as TX};
+use bitcoin::hashes::Hash;
+use bitcoin::{TapLeafHash, Transaction as TX};
 use bitcoin_script::define_pushable;
 use bitcoin_scriptexec::{Exec, ExecCtx, ExecutionResult, Options, TxTemplate};
 mod u31;
@@ -21,8 +22,9 @@ define_pushable!();
 #[allow(dead_code)]
 // Re-export what is needed to write treepp scripts
 pub mod treepp {
-    pub use crate::execute_script;
     pub use bitcoin_script::{define_pushable, script};
+
+    pub use crate::execute_script;
 
     define_pushable!();
     pub use bitcoin::ScriptBuf as Script;

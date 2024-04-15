@@ -1,13 +1,11 @@
 use std::usize;
 
+use bitcoin::opcodes::{OP_ADD, OP_FROMALTSTACK, OP_LSHIFT, OP_SWAP, OP_TOALTSTACK};
+use bitcoin::ScriptBuf as Script;
+use bitcoin_script::script;
+
 use crate::fri::NativeField;
 use crate::{pushable, unroll};
-use bitcoin::opcodes::{OP_ADD, OP_LSHIFT, OP_SWAP};
-use bitcoin::{
-    opcodes::{OP_FROMALTSTACK, OP_TOALTSTACK},
-    ScriptBuf as Script,
-};
-use bitcoin_script::script;
 mod m31;
 pub use m31::*;
 
@@ -205,69 +203,66 @@ pub fn fold_degree<M: U31Config, F: NativeField>(
     }
 }
 
-
 #[cfg(test)]
 mod test {
-    use crate::execute_script;
-    use bitcoin::{opcodes::OP_EQUAL, Script};
+    use bitcoin::opcodes::OP_EQUAL;
+    use bitcoin::Script;
     use p3_baby_bear::BabyBear;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
 
     use super::*;
+    use crate::execute_script;
 
     #[test]
     fn test_folding_poly() {
-
         let beta = BabyBear::from_u32(2);
 
         let mut y0_vector = Vec::new();
         let mut y1_vector = Vec::new();
 
-        let y0 = vec![1,2013265920];
+        let y0 = vec![1, 2013265920];
         let y1 = vec![2];
         y0_vector.push(y0);
         y1_vector.push(y1);
-        
+
         let y0 = vec![6, 569722814, 2013265919, 1443543103];
         let y1 = vec![10, 2013265915];
         y0_vector.push(y0);
         y1_vector.push(y1);
 
-        let y0 = vec![120, 1124803747, 1939037439, 700342088, 265625335, 1911300408, 1407786753, 1273260695, 2013265913, 740005210, 605479152, 101965497, 1747640570, 1312923817, 74228466, 888462158];
-        let y1 = vec![184, 1790580475, 796876005, 196828417, 2013265897, 1816437456, 1216389868, 222685398];
+        let y0 = vec![
+            120, 1124803747, 1939037439, 700342088, 265625335, 1911300408, 1407786753, 1273260695,
+            2013265913, 740005210, 605479152, 101965497, 1747640570, 1312923817, 74228466,
+            888462158,
+        ];
+        let y1 = vec![
+            184, 1790580475, 796876005, 196828417, 2013265897, 1816437456, 1216389868, 222685398,
+        ];
         y0_vector.push(y0);
         y1_vector.push(y1);
 
-        for (index,log_n )in vec![1,2,4].iter().enumerate(){
+        for (index, log_n) in vec![1, 2, 4].iter().enumerate() {
             let n = 1 << log_n;
             let y0 = y0_vector[index].clone();
             let y1 = y1_vector[index].clone();
 
-            let subgroup= BabyBear::sub_group(*log_n as usize);
-            
-            for j in 0..n as usize{
+            let subgroup = BabyBear::sub_group(*log_n as usize);
+
+            for j in 0..n as usize {
                 let x_index = j;
-                let x_nge_index = (n/2 +x_index) % n;
+                let x_nge_index = (n / 2 + x_index) % n;
                 let x = subgroup[x_index as usize];
                 let y0_x = BabyBear::from_u32(y0[x_index]);
                 let y0_neg_x = BabyBear::from_u32(y0[x_nge_index]);
-                let y_1_x_quare = BabyBear::from_u32(y1[x_index % (n/2)]);
-                let script = fold_degree::<BabyBearU31, BabyBear>(
-                    2,
-                    x,
-                    y0_x,
-                    y0_neg_x,
-                    beta,
-                    y_1_x_quare,
-                );
+                let y_1_x_quare = BabyBear::from_u32(y1[x_index % (n / 2)]);
+                let script =
+                    fold_degree::<BabyBearU31, BabyBear>(2, x, y0_x, y0_neg_x, beta, y_1_x_quare);
 
                 let result = execute_script(script);
                 assert!(result.success);
             }
-    
         }
-        
     }
 
     #[test]

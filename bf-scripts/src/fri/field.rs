@@ -1,7 +1,5 @@
 pub use p3_baby_bear::BabyBear;
-use p3_field::AbstractField;
-use p3_field::TwoAdicField;
-use p3_field::{PrimeField, PrimeField32};
+use p3_field::{AbstractField, PrimeField, PrimeField32, TwoAdicField};
 use rand::Rng;
 pub trait NativeField:
     PrimeField + PrimeField32 + AbstractField + TwoAdicField + Clone + Copy
@@ -25,7 +23,7 @@ pub trait NativeField:
         let mut subgroups = Vec::new();
         let mut acc = generator;
         subgroups.push(Self::one());
-        for i in 0..group_size-1 {
+        for i in 0..group_size - 1 {
             subgroups.push(acc);
             acc = acc * generator;
         }

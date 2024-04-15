@@ -96,10 +96,9 @@ mod tests {
     fn test_fold_even_odd_1() {
         type F = BabyBear;
 
-
         let log_n = 4;
         let n = 1 << log_n;
-        let coeffs = (0..n).map(|i:u32| F::from_u32(i)).collect::<Vec<_>>();
+        let coeffs = (0..n).map(|i: u32| F::from_u32(i)).collect::<Vec<_>>();
 
         let dft = Radix2Dit::default();
         let evals = dft.dft(coeffs.clone());
@@ -114,7 +113,7 @@ mod tests {
         let expected = izip!(even_evals, odd_evals)
             .map(|(even, odd)| even + beta * odd)
             .collect::<Vec<_>>();
-        
+
         print!("{:?}", expected);
         print!("{:?}", evals);
         // fold_even_odd takes and returns in bitrev order.
@@ -125,6 +124,4 @@ mod tests {
 
         assert_eq!(expected, folded);
     }
-
 }
-

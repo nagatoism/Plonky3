@@ -15,14 +15,14 @@
 // BEAT OUR IMPLEMENTATION AND WIN A CODE GOLF BOUNTY!
 //
 
-pub use crate::execute_script;
-use crate::{convert_digits_to_u31, convert_digits_to_u32, BabyBearU31 as BabyBear};
 pub use bitcoin_script::{define_pushable, script};
 
-define_pushable!();
-use bitcoin::ScriptBuf as Script;
+pub use crate::execute_script;
+use crate::{convert_digits_to_u31, convert_digits_to_u32, BabyBearU31 as BabyBear};
 
+define_pushable!();
 use bitcoin::hashes::{hash160, Hash};
+use bitcoin::ScriptBuf as Script;
 use hex::decode as hex_decode;
 // 0000 ~ 1111 (0~15)
 
@@ -294,15 +294,12 @@ pub fn convert_messsage_digits_to_u32() -> Script {
 
 #[cfg(test)]
 mod test {
-    use bitcoin::{
-        amount::CheckedSum,
-        ecdsa::Signature,
-        opcodes::{OP_EQUAL, OP_FROMALTSTACK},
-    };
-
-    use crate::execute_script_with_inputs;
+    use bitcoin::amount::CheckedSum;
+    use bitcoin::ecdsa::Signature;
+    use bitcoin::opcodes::{OP_EQUAL, OP_FROMALTSTACK};
 
     use super::*;
+    use crate::execute_script_with_inputs;
 
     // The secret key
     const MY_SECKEY: &str = "b138982ce17ac813d505b5b40b665d404e9528e7"; // 20 byte

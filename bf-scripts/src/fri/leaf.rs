@@ -8,12 +8,13 @@
 use std::marker::PhantomData;
 use std::usize;
 
-use super::bit_commitment::*;
-use super::NativeField;
 use bitcoin::hashes::{hash160, Hash};
 use bitcoin::opcodes::{OP_EQUAL, OP_EQUALVERIFY, OP_SWAP};
 use bitcoin::ScriptBuf as Script;
 use bitcoin_script::{define_pushable, script};
+
+use super::bit_commitment::*;
+use super::NativeField;
 define_pushable!();
 
 pub struct VerifyFoldingLeaf<'a, const NUM_POLY: usize, F: NativeField> {
@@ -192,9 +193,8 @@ mod test {
     use p3_baby_bear::BabyBear;
     use rand::Rng;
 
-    use crate::execute_script_with_inputs;
-
     use super::*;
+    use crate::execute_script_with_inputs;
 
     #[test]
     fn test_leaf_execution() {

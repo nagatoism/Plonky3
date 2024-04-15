@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 
 use crate::pseudo::{OP_256MUL, OP_4DUP};
-
 use crate::treepp::{pushable, script, Script};
 
 /// Pushes a value as u32 element onto the stack

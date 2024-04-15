@@ -1,8 +1,8 @@
-use crate::u31::{u31_add, u31_double, BabyBearU31 as BabyBear};
-use crate::U31ExtConfig;
-use crate::{karatsuba_big, pushable};
 use bitcoin::ScriptBuf as Script;
 use bitcoin_script::script;
+
+use crate::u31::{u31_add, u31_double, BabyBearU31 as BabyBear};
+use crate::{karatsuba_big, pushable, U31ExtConfig};
 
 pub struct BabyBear4;
 
@@ -50,15 +50,16 @@ impl U31ExtConfig for BabyBear4 {
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        execute_script, u31ext_add, u31ext_double, u31ext_equalverify, u31ext_mul, u31ext_sub,
-    };
     use core::ops::{Add, Mul, Neg};
+
     use p3_field::{AbstractExtensionField, AbstractField, PrimeField32};
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
 
     use super::*;
+    use crate::{
+        execute_script, u31ext_add, u31ext_double, u31ext_equalverify, u31ext_mul, u31ext_sub,
+    };
 
     type F = p3_field::extension::BinomialExtensionField<p3_baby_bear::BabyBear, 4>;
 
