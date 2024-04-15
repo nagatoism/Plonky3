@@ -104,35 +104,6 @@ pub fn u31_mul<M: U31Config>() -> Script {
     }
 }
 
-pub fn convert_digits_to_u31<M: U31Config, const DIGITS_BITSIZE: usize, const DIGITS_NUM: usize>(
-) -> Script {
-    //0x87654321;
-    // The stack before convert_D_to_u31 looks like(DIGITS_BITSIZE=8,DIGITS_NUM=4 ):
-    // 0x21
-    // 0x43
-    // 0x65
-    // 0x87
-    script! {
-        // The Top Element of the stack is the lowest-bit-value and does not need to be dealed.
-        OP_TOALTSTACK
-        for i in 1..DIGITS_NUM-1{
-            // STACK:[a,b]  OP_LSHIFT:Logical left shift b bits. Sign data is discarded
-            {DIGITS_BITSIZE}
-            OP_SWAP
-            OP_LSHIFT
-            OP_FROMALTSTACK
-            OP_ADD
-            OP_TOALTSTACK
-        }
-        // The ADD operation happened at the final maybe exceed MOD, using u31_ADD here.
-        {DIGITS_BITSIZE}
-        OP_SWAP
-        OP_LSHIFT
-        OP_FROMALTSTACK
-        {u31_add::<M>()}
-    }
-}
-
 pub fn convert_digits_to_u32<const DIGITS_BITSIZE: usize, const DIGITS_NUM: usize>() -> Script {
     //0x87654321;
     // The stack before convert_D_to_u31 looks like(DIGITS_BITSIZE=8,DIGITS_NUM=4 ):
