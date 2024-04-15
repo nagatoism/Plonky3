@@ -29,5 +29,6 @@ members = [
     "symmetric",
     "util",
     "uni-stark",
-    "bf-fri", "bf-scripts",
+    "bf-fri", 
+    "bf-scripts",
 ]
