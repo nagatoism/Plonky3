@@ -174,17 +174,6 @@ pub fn sign_script(secret_key: &str, message_digits: [u8; N0 as usize]) -> Scrip
             { digit_signature_script(secret_key, i, checksum_digits[ (N-1-i) as usize]) }
         }
     }
-    // if the message is [1, 2, 3, 4, 5, 6, 7, 8]; checksum=84(0101,0100) [5,4]
-    // the script looks like:
-    // OP_PUSHBYTES_20 HASH_8 OP_PUSHNUM_8 OP_PUSHBYTES_20 HASH_7 OP_PUSHNUM_7 ... OP_PUSHBYTES_20 HASH_1 OP_PUSHNUM_1 || OP_PUSHBYTES_20 HASH_4 OP_PUSHNUM_4 OP_PUSHBYTES_20 HASH_2 OP_PUSHNUM_2
-    // let sig = sign(secret_key,message_digits);
-    // script!{
-    //     for i in 0..N {
-
-    //         {sig.clone()}
-
-    //     }
-    // }
 }
 
 ///  Locking Script for a Winternitz signature
