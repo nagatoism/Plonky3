@@ -96,11 +96,10 @@ mod tests {
     fn test_fold_even_odd_1() {
         type F = BabyBear;
 
-        let mut rng = thread_rng();
 
-        let log_n = 2;
+        let log_n = 4;
         let n = 1 << log_n;
-        let coeffs = (0..n).map(|_| rng.gen::<F>()).collect::<Vec<_>>();
+        let coeffs = (0..n).map(|i:u32| F::from_u32(i)).collect::<Vec<_>>();
 
         let dft = Radix2Dit::default();
         let evals = dft.dft(coeffs.clone());
@@ -116,8 +115,8 @@ mod tests {
             .map(|(even, odd)| even + beta * odd)
             .collect::<Vec<_>>();
         
-        println!("{:?}  {:?}", evals[0],evals[2]);
-        println!("{:?}", expected[0]);
+        print!("{:?}", expected);
+        print!("{:?}", evals);
         // fold_even_odd takes and returns in bitrev order.
         let mut folded = evals;
         reverse_slice_index_bits(&mut folded);
