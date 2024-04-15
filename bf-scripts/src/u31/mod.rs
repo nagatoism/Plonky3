@@ -165,7 +165,7 @@ pub fn fold_degree<M: U31Config, F: NativeField>(
     x: F,
     y_0_x: F,
     y_0_neg_x: F,
-    v_0: F,
+    beta: F,
     y_1_x_quare: F,
 ) -> Script {
     script! {
@@ -174,18 +174,19 @@ pub fn fold_degree<M: U31Config, F: NativeField>(
         {y_0_x.as_u32()}
         {y_0_neg_x.as_u32()}
         { u31_add::<M>() }
-        // calculate 2 * r * g_0,1(r^2)
+        // calculate 2 * x * g_0,1(r^2)
         { x.as_u32()}
         { u31_mul::<M>()}
         OP_TOALTSTACK
 
-        // calculate 2 * r * g_0,2(r^2)
+        // calculate 2 * x * g_0,2(r^2)
         {y_0_x.as_u32()}
         {y_0_neg_x.as_u32()}
         { u31_sub::<M>() }
-        // calculate 2 * r * v_0 * g_0,2(r^2)
-        {v_0.as_u32()}
+        // calculate 2 * r * beta * g_0,2(r^2)
+        {beta.as_u32()}
         {u31_mul::<M>()}
+        // calaulate (2 * r * beta * g_0,2(r^2)) + (2 * r * g_0,1(r^2))
         OP_FROMALTSTACK
         { u31_add::<M>() }
         OP_TOALTSTACK
@@ -197,24 +198,77 @@ pub fn fold_degree<M: U31Config, F: NativeField>(
         {u31_mul::<M>()}
 
         // Check Equal
-        // y_1(r^2) = g_0,1(r^2) + v_0 g_0,2(r^2)
-        // 2r y_1(r^2) = 2r g_0,1(r^2) + 2r v_0 g_0,2(r^2)
+        // y_1(r^2) = g_0,1(r^2) + beta g_0,2(r^2)
+        // 2r y_1(r^2) = 2r g_0,1(r^2) + 2r beta g_0,2(r^2)
         OP_FROMALTSTACK
         OP_EQUAL
     }
 }
 
+
 #[cfg(test)]
 mod test {
     use crate::execute_script;
     use bitcoin::{opcodes::OP_EQUAL, Script};
+    use p3_baby_bear::BabyBear;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
 
     use super::*;
 
     #[test]
-    fn test_folding_poly() {}
+    fn test_folding_poly() {
+
+        let beta = BabyBear::from_u32(2);
+
+        let mut y0_vector = Vec::new();
+        let mut y1_vector = Vec::new();
+
+        let y0 = vec![1,2013265920];
+        let y1 = vec![2];
+        y0_vector.push(y0);
+        y1_vector.push(y1);
+        
+        let y0 = vec![6, 569722814, 2013265919, 1443543103];
+        let y1 = vec![10, 2013265915];
+        y0_vector.push(y0);
+        y1_vector.push(y1);
+
+        let y0 = vec![120, 1124803747, 1939037439, 700342088, 265625335, 1911300408, 1407786753, 1273260695, 2013265913, 740005210, 605479152, 101965497, 1747640570, 1312923817, 74228466, 888462158];
+        let y1 = vec![184, 1790580475, 796876005, 196828417, 2013265897, 1816437456, 1216389868, 222685398];
+        y0_vector.push(y0);
+        y1_vector.push(y1);
+
+        for (index,log_n )in vec![1,2,4].iter().enumerate(){
+            let n = 1 << log_n;
+            let y0 = y0_vector[index].clone();
+            let y1 = y1_vector[index].clone();
+
+            let subgroup= BabyBear::sub_group(*log_n as usize);
+            
+            for j in 0..n as usize{
+                let x_index = j;
+                let x_nge_index = (n/2 +x_index) % n;
+                let x = subgroup[x_index as usize];
+                let y0_x = BabyBear::from_u32(y0[x_index]);
+                let y0_neg_x = BabyBear::from_u32(y0[x_nge_index]);
+                let y_1_x_quare = BabyBear::from_u32(y1[x_index % (n/2)]);
+                let script = fold_degree::<BabyBearU31, BabyBear>(
+                    2,
+                    x,
+                    y0_x,
+                    y0_neg_x,
+                    beta,
+                    y_1_x_quare,
+                );
+
+                let result = execute_script(script);
+                assert!(result.success);
+            }
+    
+        }
+        
+    }
 
     #[test]
     fn test_u32_add() {

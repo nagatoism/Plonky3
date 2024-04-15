@@ -24,7 +24,8 @@ pub trait NativeField:
         // let mut subgroups = Vec::with_capacity(2^group_bit_size);
         let mut subgroups = Vec::new();
         let mut acc = generator;
-        for i in 0..group_size {
+        subgroups.push(Self::one());
+        for i in 0..group_size-1 {
             subgroups.push(acc);
             acc = acc * generator;
         }
