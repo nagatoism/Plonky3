@@ -1,6 +1,7 @@
 use alloc::vec;
 use alloc::vec::Vec;
 
+use bitcoin::taproot::merkle_branch;
 use itertools::Itertools;
 use p3_challenger::{CanObserve, CanSample, GrindingChallenger};
 use p3_commit::{DirectMmcs, Mmcs};
@@ -9,10 +10,11 @@ use p3_matrix::dense::RowMajorMatrix;
 use tracing::{info_span, instrument};
 
 use crate::fold_even_odd::fold_even_odd;
-use crate::{CommitPhaseProofStep, FriConfig, FriProof, QueryProof};
+use crate::{BfCommitPhaseProofStep, CommitPhaseProofStep, FriConfig, FriProof, QueryProof};
+
 
 #[instrument(name = "FRI prover", skip_all)]
-pub fn prove<F, M, Challenger>(
+pub fn bf_prove<F, M, Challenger>(
     config: &FriConfig<M>,
     input: &[Option<Vec<F>>; 32],
     challenger: &mut Challenger,
@@ -22,13 +24,16 @@ where
     M: DirectMmcs<F>,
     Challenger: GrindingChallenger + CanObserve<M::Commitment> + CanSample<F>,
 {
+    // ToDo: support Muti-Matrixs 
+    assert_eq!(input.len(),1);
+
     // 1. rposition start iterator from the end and calculate the valid leagth of the polynomial want commit
     let log_max_height = input.iter().rposition(Option::is_some).unwrap();
 
-    let commit_phase_result = commit_phase(config, input, log_max_height, challenger);
+    let commit_phase_result = bf_commit_phase(config, input, log_max_height, challenger);
 
     let pow_witness = challenger.grind(config.proof_of_work_bits);
-
+ 
     let query_indices: Vec<usize> = (0..config.num_queries)
         .map(|_| challenger.sample_bits(log_max_height))
         .collect();
@@ -36,7 +41,7 @@ where
     let query_proofs = info_span!("query phase").in_scope(|| {
         query_indices
             .iter()
-            .map(|&index| answer_query(config, &commit_phase_result.data, index))
+            .map(|&index| bf_answer_query(config, &commit_phase_result.data, index))
             .collect()
     });
 
@@ -51,7 +56,7 @@ where
     )
 }
 
-fn answer_query<F, M>(
+fn bf_answer_query<F, M>(
     config: &FriConfig<M>,
     commit_phase_commits: &[M::ProverData],
     index: usize,
@@ -60,23 +65,23 @@ where
     F: Field,
     M: Mmcs<F>,
 {
+
     let commit_phase_openings = commit_phase_commits
         .iter()
         .enumerate()
         .map(|(i, commit)| {
             let index_i = index >> i;
-            let index_i_sibling = index_i ^ 1;
-            let index_pair = index_i >> 1;
+            // let index_i_sibling = index_i ^ 1;
+            // let index_pair = index_i >> 1;
 
-            let (mut opened_rows, opening_proof) = config.mmcs.open_batch(index_pair, commit);
-            assert_eq!(opened_rows.len(), 1);
-            let opened_row = opened_rows.pop().unwrap();
-            assert_eq!(opened_row.len(), 2, "Committed data should be in pairs");
-            let sibling_value = opened_row[index_i_sibling % 2];
+            let (mut leaf_node, merkle_branch) = config.mmcs.open_batch(index_i, commit);
+            assert_eq!(leaf_node.len(), 1);
+            assert_eq!(leaf_node[0].len(), 1);
+            let leaf_node: <M as Mmcs<F>>::LeafType = leaf_node.pop().unwrap()[0];
 
-            CommitPhaseProofStep {
-                sibling_value,
-                opening_proof,
+            BfCommitPhaseProofStep {
+                leaf_node,
+                merkle_branch,
             }
         })
         .collect();
@@ -86,8 +91,12 @@ where
     }
 }
 
+pub const BF_MATRIX_WIDTH:usize = 1;
+pub const DEFAULT_MATRIX_WIDTH:usize = 2;
+
+
 #[instrument(name = "commit phase", skip_all)]
-fn commit_phase<F, M, Challenger>(
+fn bf_commit_phase<F, M, Challenger>(
     config: &FriConfig<M>,
     input: &[Option<Vec<F>>; 32],
     log_max_height: usize,
@@ -104,7 +113,7 @@ where
     let mut data = vec![];
 
     for log_folded_height in (config.log_blowup..log_max_height).rev() {
-        let leaves = RowMajorMatrix::new(current.clone(), 2);
+        let leaves = RowMajorMatrix::new(current.clone(), BF_MATRIX_WIDTH);
         let (commit, prover_data) = config.mmcs.commit_matrix(leaves);
         challenger.observe(commit.clone());
         commits.push(commit);
@@ -113,9 +122,9 @@ where
         let beta: F = challenger.sample();
         current = fold_even_odd(current, beta);
 
-        if let Some(v) = &input[log_folded_height] {
-            current.iter_mut().zip_eq(v).for_each(|(c, v)| *c += *v);
-        }
+        // if let Some(v) = &input[log_folded_height] {
+        //     current.iter_mut().zip_eq(v).for_each(|(c, v)| *c += *v);
+        // }
     }
 
     // We should be left with `blowup` evaluations of a constant polynomial.
@@ -137,3 +146,4 @@ struct CommitPhaseResult<F, M: Mmcs<F>> {
     data: Vec<M::ProverData>,
     final_poly: F,
 }
+

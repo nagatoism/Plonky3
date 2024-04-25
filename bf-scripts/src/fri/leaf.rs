@@ -15,10 +15,12 @@ use bitcoin_script::{define_pushable, script};
 
 use super::bit_commitment::*;
 use super::NativeField;
+use crate::{fold_degree, BabyBearU31};
 define_pushable!();
 
 pub struct VerifyFoldingLeaf<'a, const NUM_POLY: usize, F: NativeField> {
     x: F,
+    beta: &'a BitCommitment<F>,
     y_0_x_commitment: &'a BitCommitment<F>,
     y_0_neg_x_commitment: &'a BitCommitment<F>,
     y_1_x_square_commitment: &'a BitCommitment<F>,
@@ -27,21 +29,30 @@ pub struct VerifyFoldingLeaf<'a, const NUM_POLY: usize, F: NativeField> {
 impl<'a, const NUM_POLY: usize, F: NativeField> VerifyFoldingLeaf<'a, NUM_POLY, F> {
     fn new(
         x: F,
+        beta: &'a BitCommitment<F>,
         y_0_x_commitment: &'a BitCommitment<F>,
         y_0_neg_x_commitment: &'a BitCommitment<F>,
         y_1_x_square_commitment: &'a BitCommitment<F>,
     ) -> Self {
         VerifyFoldingLeaf {
             x,
+            beta,
             y_0_x_commitment,
             y_0_neg_x_commitment,
             y_1_x_square_commitment,
         }
     }
 
-    // fn leaf_script(&self) -> Script{
-
-    // }
+    fn leaf_script(&self) -> Script {
+        fold_degree::<BabyBearU31>(
+            2,
+            self.x.as_u32(),
+            self.y_0_x_commitment.origin_value,
+            self.y_0_neg_x_commitment.origin_value,
+            self.beta.origin_value,
+            self.y_1_x_square_commitment.origin_value,
+        )
+    }
 
     pub fn check_equal_script(&self) -> Script {
         script! {

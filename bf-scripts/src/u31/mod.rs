@@ -129,31 +129,31 @@ pub fn convert_digits_to_u32<const DIGITS_BITSIZE: usize, const DIGITS_NUM: usiz
 // y_0(r)= g_0,1(r^2) + r g_0,2(r^2)
 // y_0(-r)= g_0,1(r^2) -r g_0,2(r^2)
 // y_1(r^2) = g_0,1(r^2) + v_0 g_0,2(r^2)
-pub fn fold_degree<M: U31Config, F: NativeField>(
+pub fn fold_degree<M: U31Config>(
     degree: u32,
-    x: F,
-    y_0_x: F,
-    y_0_neg_x: F,
-    beta: F,
-    y_1_x_quare: F,
+    x: u32,
+    y_0_x: u32,
+    y_0_neg_x: u32,
+    beta: u32,
+    y_1_x_quare: u32,
 ) -> Script {
     script! {
 
         // calculate 2 * g_0,1(r^2)
-        {y_0_x.as_u32()}
-        {y_0_neg_x.as_u32()}
+        {y_0_x}
+        {y_0_neg_x}
         { u31_add::<M>() }
         // calculate 2 * x * g_0,1(r^2)
-        { x.as_u32()}
+        { x}
         { u31_mul::<M>()}
         OP_TOALTSTACK
 
         // calculate 2 * x * g_0,2(r^2)
-        {y_0_x.as_u32()}
-        {y_0_neg_x.as_u32()}
+        {y_0_x}
+        {y_0_neg_x}
         { u31_sub::<M>() }
         // calculate 2 * r * beta * g_0,2(r^2)
-        {beta.as_u32()}
+        {beta}
         {u31_mul::<M>()}
         // calaulate (2 * r * beta * g_0,2(r^2)) + (2 * r * g_0,1(r^2))
         OP_FROMALTSTACK
@@ -161,9 +161,9 @@ pub fn fold_degree<M: U31Config, F: NativeField>(
         OP_TOALTSTACK
 
         // calculate 2*r*y_1(r^2)
-        {y_1_x_quare.as_u32()}
+        {y_1_x_quare}
         {u31_double::<M>()}
-        {x.as_u32()}
+        {x}
         {u31_mul::<M>()}
 
         // Check Equal
@@ -224,11 +224,17 @@ mod test {
                 let x_index = j;
                 let x_nge_index = (n / 2 + x_index) % n;
                 let x = subgroup[x_index as usize];
-                let y0_x = BabyBear::from_u32(y0[x_index]);
-                let y0_neg_x = BabyBear::from_u32(y0[x_nge_index]);
-                let y_1_x_quare = BabyBear::from_u32(y1[x_index % (n / 2)]);
-                let script =
-                    fold_degree::<BabyBearU31, BabyBear>(2, x, y0_x, y0_neg_x, beta, y_1_x_quare);
+                let y0_x = y0[x_index];
+                let y0_neg_x = y0[x_nge_index];
+                let y_1_x_quare = y1[x_index % (n / 2)];
+                let script = fold_degree::<BabyBearU31>(
+                    2,
+                    x.as_u32(),
+                    y0_x,
+                    y0_neg_x,
+                    beta.as_u32(),
+                    y_1_x_quare,
+                );
 
                 let result = execute_script(script);
                 assert!(result.success);

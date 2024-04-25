@@ -1,5 +1,6 @@
 use alloc::vec::Vec;
 
+use bitcoin::taproot::LeafNode;
 use p3_commit::Mmcs;
 use p3_field::Field;
 use serde::{Deserialize, Serialize};
@@ -36,4 +37,16 @@ pub struct CommitPhaseProofStep<F: Field, M: Mmcs<F>> {
     pub(crate) sibling_value: F,
 
     pub(crate) opening_proof: M::Proof,
+}
+
+#[derive(Serialize, Deserialize)]
+// #[serde(bound(serialize = "F: Serialize"))]
+#[serde(bound = "")]
+pub struct BfCommitPhaseProofStep<F: Field, M: Mmcs<F>> {
+    /// The opening of the commit phase codeword at the sibling location.
+    // This may change to Vec<FC::Challenge> if the library is generalized to support other FRI
+    // folding arities besides 2, meaning that there can be multiple siblings.
+    pub(crate) leaf_node: M::LeafType,
+
+    pub(crate) merkle_branch: M::Proof,
 }

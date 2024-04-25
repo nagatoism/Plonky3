@@ -18,7 +18,6 @@
 pub use bitcoin_script::{define_pushable, script};
 
 pub use crate::execute_script;
-use crate::BabyBearU31 as BabyBear;
 
 define_pushable!();
 use bitcoin::hashes::{hash160, Hash};
@@ -273,10 +272,15 @@ pub fn checksig_verify(pub_key: &[Vec<u8>]) -> Script {
     }
 }
 
+// The equivocation script is anyone can prove that the prover reveal two valid signatures
+// The input of this function is two signatures and the script uses to check these signatures whether all valid.
+// So we need to force these two signature is different
+pub fn equivocation(pub_key: &[Vec<u8>]) -> Script {
+    script! {}
+}
+
 #[cfg(test)]
 mod test {
-    use bitcoin::amount::CheckedSum;
-    use bitcoin::ecdsa::Signature;
     use bitcoin::opcodes::{OP_EQUAL, OP_FROMALTSTACK};
 
     use super::*;

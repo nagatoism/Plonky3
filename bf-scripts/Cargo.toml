@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 bitcoin-script = { git = "https://github.com/cyl19970726/rust-bitcoin-script", branch = "script_macro" }
 bitcoin = { git = "https://github.com/cyl19970726/rust-bitcoin", branch = "merge" }
+# bitcoin = { path = "../../../bitvm/rust-bitcoin/bitcoin"}
 bitcoin-scriptexec = { git = "https://github.com/cyl19970726/rust-bitcoin-scriptexec" }
 
 rand_chacha = "0.3.1"
