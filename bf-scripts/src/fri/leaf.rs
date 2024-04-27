@@ -63,6 +63,75 @@ impl<'a, const NUM_POLY: usize, F: NativeField> VerifyFoldingLeaf<'a, NUM_POLY, 
     }
 }
 
+pub struct TwoPointsLeaf<F: NativeField> {
+    leaf_index_1: usize,
+    leaf_index_2: usize,
+    p1: Point<F>,
+    p2: Point<F>,
+}
+
+impl<F: NativeField> TwoPointsLeaf<F> {
+    pub fn new(
+        leaf_index_1: usize,
+        leaf_index_2: usize,
+        x1: F,
+        y1: F,
+        x2: F,
+        y2: F,
+    ) -> TwoPointsLeaf<F> {
+        let p1 = Point::<F>::new(x1, y1);
+        let p2 = Point::<F>::new(x2, y2);
+        Self {
+            leaf_index_1,
+            leaf_index_2,
+            p1,
+            p2,
+        }
+    }
+
+    pub fn commit_script(&self) -> Script {
+        let scripts = script! {
+            {self.p1.commit_script()}
+            {self.p2.commit_script()}
+            OP_1
+        };
+        scripts
+    }
+}
+
+pub struct Point<F: NativeField> {
+    x: F,
+    y: F,
+    x_commit: BitCommitment<F>,
+    y_commit: BitCommitment<F>,
+}
+
+impl<F: NativeField> Point<F> {
+    pub fn new(x: F, y: F) -> Point<F> {
+        let x_commit =
+            BitCommitment::new("b138982ce17ac813d505b5b40b665d404e9528e8".to_string(), x);
+        let y_commit =
+            BitCommitment::new("b138982ce17ac813d505b5b40b665d404e9528e8".to_string(), y);
+        Self {
+            x: x,
+            y: y,
+            x_commit: x_commit,
+            y_commit: y_commit,
+        }
+    }
+
+    pub fn commit_script(&self) -> Script {
+        let scripts = script! {
+            { self.x_commit.checksig_verify_script() }
+            { self.x_commit.check_equal_script() }
+            { self.y_commit.checksig_verify_script() }
+            { self.y_commit.check_equal_script() }
+        };
+
+        scripts
+    }
+}
+
 pub struct EvaluationLeaf<const NUM_POLY: usize, F: NativeField> {
     leaf_index: usize,
     x: F,
@@ -106,6 +175,23 @@ impl<const NUM_POLY: usize, F: NativeField> EvaluationLeaf<NUM_POLY, F> {
             { self.x_commitment.checksig_verify_script() }
             { self.x_commitment.check_equal_script() }
             // todo: calculate to equal to -x
+            for i in 0..NUM_POLY{
+                { self.evaluations_commitments[NUM_POLY-1-i].checksig_verify_script() }
+                { self.evaluations_commitments[NUM_POLY-1-i].check_equal_script() }
+            }
+            OP_1
+        };
+
+        scripts
+    }
+
+    pub fn two_point_leaf_script(&self) -> Script {
+        // equal to x script
+        let scripts = script! {
+            { self.x_commitment.checksig_verify_script() }
+            { self.x_commitment.check_equal_script() }
+            { self.neg_x_commitment.checksig_verify_script() }
+            { self.neg_x_commitment.check_equal_script() }
             for i in 0..NUM_POLY{
                 { self.evaluations_commitments[NUM_POLY-1-i].checksig_verify_script() }
                 { self.evaluations_commitments[NUM_POLY-1-i].check_equal_script() }
