@@ -9,11 +9,13 @@ mod fold_even_odd;
 pub mod mmcs;
 mod proof;
 pub mod prover;
-mod two_adic_pcs;
+// mod two_adic_pcs;
+pub mod error;
+pub mod taptree;
 pub mod verifier;
 
 pub use config::*;
 pub use fold_even_odd::*;
 pub use mmcs::*;
 pub use proof::*;
-pub use two_adic_pcs::*;
+// pub use two_adic_pcs::*;

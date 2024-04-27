@@ -1,8 +1,6 @@
 use alloc::vec;
 use alloc::vec::Vec;
 
-use bitcoin::taproot::merkle_branch;
-use itertools::Itertools;
 use p3_challenger::{CanObserve, CanSample, GrindingChallenger};
 use p3_commit::{DirectMmcs, Mmcs};
 use p3_field::{Field, TwoAdicField};
@@ -10,8 +8,7 @@ use p3_matrix::dense::RowMajorMatrix;
 use tracing::{info_span, instrument};
 
 use crate::fold_even_odd::fold_even_odd;
-use crate::{BfCommitPhaseProofStep, CommitPhaseProofStep, FriConfig, FriProof, QueryProof};
-
+use crate::{BfCommitPhaseProofStep, BfQueryProof, FriConfig, FriProof};
 
 #[instrument(name = "FRI prover", skip_all)]
 pub fn bf_prove<F, M, Challenger>(
@@ -21,11 +18,11 @@ pub fn bf_prove<F, M, Challenger>(
 ) -> (FriProof<F, M, Challenger::Witness>, Vec<usize>)
 where
     F: TwoAdicField,
-    M: DirectMmcs<F>,
+    M: DirectMmcs<F, Proof = BfCommitPhaseProofStep>,
     Challenger: GrindingChallenger + CanObserve<M::Commitment> + CanSample<F>,
 {
-    // ToDo: support Muti-Matrixs 
-    assert_eq!(input.len(),1);
+    // ToDo: support Muti-Matrixs
+    assert_eq!(input.len(), 1);
 
     // 1. rposition start iterator from the end and calculate the valid leagth of the polynomial want commit
     let log_max_height = input.iter().rposition(Option::is_some).unwrap();
@@ -33,7 +30,7 @@ where
     let commit_phase_result = bf_commit_phase(config, input, log_max_height, challenger);
 
     let pow_witness = challenger.grind(config.proof_of_work_bits);
- 
+
     let query_indices: Vec<usize> = (0..config.num_queries)
         .map(|_| challenger.sample_bits(log_max_height))
         .collect();
@@ -60,40 +57,29 @@ fn bf_answer_query<F, M>(
     config: &FriConfig<M>,
     commit_phase_commits: &[M::ProverData],
     index: usize,
-) -> QueryProof<F, M>
+) -> BfQueryProof
 where
     F: Field,
-    M: Mmcs<F>,
+    M: Mmcs<F, Proof = BfCommitPhaseProofStep>,
 {
-
     let commit_phase_openings = commit_phase_commits
         .iter()
         .enumerate()
         .map(|(i, commit)| {
             let index_i = index >> i;
-            // let index_i_sibling = index_i ^ 1;
-            // let index_pair = index_i >> 1;
 
-            let (mut leaf_node, merkle_branch) = config.mmcs.open_batch(index_i, commit);
-            assert_eq!(leaf_node.len(), 1);
-            assert_eq!(leaf_node[0].len(), 1);
-            let leaf_node: <M as Mmcs<F>>::LeafType = leaf_node.pop().unwrap()[0];
-
-            BfCommitPhaseProofStep {
-                leaf_node,
-                merkle_branch,
-            }
+            let proof = config.mmcs.open_taptree(index_i, commit);
+            proof
         })
         .collect();
 
-    QueryProof {
+    BfQueryProof {
         commit_phase_openings,
     }
 }
 
-pub const BF_MATRIX_WIDTH:usize = 1;
-pub const DEFAULT_MATRIX_WIDTH:usize = 2;
-
+pub const BF_MATRIX_WIDTH: usize = 1;
+pub const DEFAULT_MATRIX_WIDTH: usize = 2;
 
 #[instrument(name = "commit phase", skip_all)]
 fn bf_commit_phase<F, M, Challenger>(
@@ -113,7 +99,7 @@ where
     let mut data = vec![];
 
     for log_folded_height in (config.log_blowup..log_max_height).rev() {
-        let leaves = RowMajorMatrix::new(current.clone(), BF_MATRIX_WIDTH);
+        let leaves = RowMajorMatrix::new(current.clone(), DEFAULT_MATRIX_WIDTH);
         let (commit, prover_data) = config.mmcs.commit_matrix(leaves);
         challenger.observe(commit.clone());
         commits.push(commit);
@@ -146,4 +132,3 @@ struct CommitPhaseResult<F, M: Mmcs<F>> {
     data: Vec<M::ProverData>,
     final_poly: F,
 }
-

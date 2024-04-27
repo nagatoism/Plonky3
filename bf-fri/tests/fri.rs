@@ -83,7 +83,7 @@ fn do_test_fri_ldt<R: Rng>(rng: &mut R) {
             }
         });
 
-        let (proof, idxs) = prover::prove(&fc, &input, &mut chal);
+        let (proof, idxs) = prover::bf_prove(&fc, &input, &mut chal);
 
         let log_max_height = input.iter().rposition(Option::is_some).unwrap();
         let reduced_openings: Vec<[Challenge; 32]> = idxs

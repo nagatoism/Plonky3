@@ -4,30 +4,17 @@ use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
 use core::usize;
 
-use bf_scripts::{execute_script, leaf, EvaluationLeaf, NativeField};
+use bf_scripts::{execute_script, leaf, EvaluationLeaf, NativeField, TwoPointsLeaf};
 use bitcoin::taproot::LeafVersion::TapScript;
 use bitcoin::taproot::{
-    LeafNode, LeafNodes, NodeInfo, TapTree, TaprootBuilderError, TaprootMerkleBranch
+    LeafNode, LeafNodes, NodeInfo, TapTree, TaprootBuilderError, TaprootMerkleBranch,
 };
-use bitcoin::{ScriptBuf};
-use p3_util::log2_strict_usize;
+use bitcoin::ScriptBuf;
+use p3_util::{log2_strict_usize, reverse_slice_index_bits};
+
+use super::error::BfError;
 
 const NUM_POLY: usize = 1;
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum BfError {
-    TaprootBuilderError(TaprootBuilderError),
-    TaprootError,
-    TapLeafError,
-    TapTreeError,
-    EvaluationLeafError,
-    ExecuteScriptError,
-}
-
-impl From<TaprootBuilderError> for BfError {
-    fn from(error: TaprootBuilderError) -> Self {
-        BfError::TaprootBuilderError(error)
-    }
-}
 
 pub fn combine_two_nodes(a: NodeInfo, b: NodeInfo) -> Result<NodeInfo, BfError> {
     let parent = NodeInfo::combine(a, b)?;
@@ -84,7 +71,6 @@ impl<F: NativeField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize> Deref
     }
 }
 
-
 // =============== Polycommitment Tree ===============
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct PolyCommitTree<F: NativeField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize>(
@@ -117,7 +103,28 @@ impl<F: NativeField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize>
         }
 
         self.0.finalize();
+    }
 
+    pub fn commit_rev_points(&mut self, evaluations: Vec<F>, width: usize) {
+        let poly_points = evaluations.len();
+        let mut subgroup = F::sub_group(log2_strict_usize(poly_points));
+        let mut leaf_indexs: Vec<usize> = (0..poly_points).into_iter().collect();
+        reverse_slice_index_bits(&mut subgroup);
+        reverse_slice_index_bits(&mut leaf_indexs);
+
+        for i in (0..poly_points).into_iter().step_by(width) {
+            let leaf = TwoPointsLeaf::new(
+                leaf_indexs[i],
+                leaf_indexs[i + 1],
+                subgroup[i],
+                evaluations[i],
+                subgroup[i + 1],
+                evaluations[i + 1],
+            );
+            self.0.add_leaf(leaf.commit_script());
+        }
+
+        self.0.finalize();
     }
 }
 
@@ -164,7 +171,7 @@ impl<F: NativeField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize>
     pub fn add_leafs(&mut self, leaf_scripts: Vec<ScriptBuf>) {
         for leaf_script in leaf_scripts {
             self.tree_builder.add_leaf(leaf_script);
-        };
+        }
     }
 
     pub fn isfinalize(&self) -> bool {
@@ -190,22 +197,17 @@ impl<F: NativeField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize>
         nodes
     }
 
-    pub fn get_leaf_merkle_path(&self, index:usize) -> Option<&TaprootMerkleBranch> {
-        if let Some(leaf) = self.leaves().nth(index){
+    pub fn get_leaf_merkle_path(&self, index: usize) -> Option<&TaprootMerkleBranch> {
+        if let Some(leaf) = self.leaves().nth(index) {
             Some(leaf.merkle_branch())
-        }else {
+        } else {
             None
         }
     }
 
-    pub fn get_leaf(&self, index:usize) -> Option<&LeafNode> {
+    pub fn get_leaf(&self, index: usize) -> Option<&LeafNode> {
         self.leaves().nth(index)
     }
-
-    // pub fn get_leaf(&self,index:usize) -> Option<&LeafNode> {
-    //    let leaf = self.root_node.as_ref().unwrap().get_leaf(index);
-    //    leaf
-    // }
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
@@ -222,23 +224,6 @@ impl<const LOG_N: usize> TreeBuilder<LOG_N> {
         self.leaves
             .push(NodeInfo::new_leaf_with_ver(leaf_script, TapScript));
     }
-
-    // pub fn get_leaf_merkle_path(&self, index:usize) -> Option<Vec<NodeInfo>> {
-    //     let path = self.leaves[index].;
-    //     let mut path = Vec::new();
-    //     let mut i = index;
-    //     for _ in 0..LOG_N {
-    //         let sibling = if i % 2 == 0 {
-    //             i + 1
-    //         } else {
-    //             i - 1
-    //         };
-    //         let sibling_node = self.leaves[sibling].clone();
-    //         path.push(sibling_node);
-    //         i = i / 2;
-    //     }
-    //     Some(path)
-    // }
 
     pub fn root(&mut self) -> NodeInfo {
         assert!(self.leaves.len() as u32 == 2u32.pow(LOG_N as u32));
@@ -376,7 +361,7 @@ mod tests {
         let eva_poly1 = poly1.convert_to_evals_at_subgroup();
         let evas1 = eva_poly1.values();
 
-        let mut field_taptree_1 = PolyCommitTree::<BabyBear,1,3>::new();
+        let mut field_taptree_1 = PolyCommitTree::<BabyBear, 1, 3>::new();
 
         for i in 0..evas1.len() {
             let leaf_script = construct_evaluation_leaf_script::<1, F>(
@@ -399,7 +384,7 @@ mod tests {
         let evas2 = eva_poly2.values();
         assert!(evas2.len() == 4);
 
-        let mut field_taptree_2 = PolyCommitTree::<BabyBear,1,3>::new();
+        let mut field_taptree_2 = PolyCommitTree::<BabyBear, 1, 3>::new();
 
         for i in 0..evas2.len() {
             let leaf_script = construct_evaluation_leaf_script::<1, F>(
