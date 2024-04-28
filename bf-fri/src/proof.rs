@@ -3,8 +3,6 @@ use alloc::vec::Vec;
 use bitcoin::taproot::{LeafNode, TapLeaf, TaprootMerkleBranch};
 use p3_commit::Mmcs;
 use p3_field::Field;
-use rand::seq::index;
-use serde::de::value;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]

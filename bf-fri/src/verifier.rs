@@ -78,7 +78,7 @@ pub fn verify_challenges<F, M, Witness>(
     config: &FriConfig<M>,
     proof: &FriProof<F, M, Witness>,
     challenges: &FriChallenges<F>,
-    reduced_openings: &[[OpeningData<F>; 32]],
+    reduced_openings: &[[&OpeningData<F>; 32]],
 ) -> Result<(), FriError<M::Error>>
 where
     F: TwoAdicField,

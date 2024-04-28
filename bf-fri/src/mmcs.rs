@@ -58,7 +58,7 @@ impl<F: NativeField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize> Mmcs<F
         proof: &Self::Proof,
         root: &Self::Commitment,
     ) -> Result<(), Self::Error> {
-        let mut first_node_hash = TapNodeHash::from_node_hashes(root, proof.merkle_branch[0]);
+        let mut first_node_hash = TapNodeHash::from_node_hashes(*root, proof.merkle_branch[0]);
         proof.merkle_branch[1..]
             .into_iter()
             .for_each(|sibling_node| {
