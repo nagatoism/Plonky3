@@ -122,7 +122,6 @@ where
     M: Mmcs<F, Proof = BfCommitPhaseProofStep>,
 {
     let mut folded_eval = F::zero();
-    let mut round = 0;
     let mut r = F::zero();
     let mut y_r = F::zero();
     let mut neg_r = F::zero();
@@ -140,14 +139,15 @@ where
         let index_sibling = index ^ 1;
         let index_pair = index >> 1;
 
-        let opening = reduced_openings[log_folded_height];
+        let opening = reduced_openings[log_folded_height+1];
         assert_eq!(opening.leaf_index, index);
         assert_eq!(opening.sibling_leaf_index, index_sibling);
 
         // Todo: get x p(x) -x p(-x) value
         r = x;
         neg_r = x * F::two_adic_generator(1);
-        y_r = opening.value;
+        assert_eq!(y_r,opening.value);
+        // y_r = opening.value;
         y_neg_r = opening.sibling_value;
 
         let mut evals = vec![y_r; 2];
@@ -173,7 +173,7 @@ where
         // // calculate the x-coordiate using index*generator
         // xs[index_sibling % 2] *= F::two_adic_generator(1);// with subgroup [1,generator]
         // interpolate and evaluate at beta
-        folded_eval = evals[0] + (beta - xs[0]) * (evals[1] - evals[0]) / (xs[1] - xs[0]);
+        y_r = evals[0] + (beta - xs[0]) * (evals[1] - evals[0]) / (xs[1] - xs[0]);
 
         index = index_pair;
         x = x.square();
