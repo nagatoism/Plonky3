@@ -51,10 +51,11 @@ pub fn fold_even_odd<F: TwoAdicField>(poly: Vec<F>, beta: F) -> Vec<F> {
 #[cfg(test)]
 mod tests {
 
-    use bf_scripts::NativeField;
+    use bf_scripts::{execute_script, ext_fold_degree, ext_fold_degree1, BabyBear4, NativeField};
     use itertools::izip;
     use p3_baby_bear::BabyBear;
     use p3_dft::{Radix2Dit, TwoAdicSubgroupDft};
+    use p3_field::{extension::BinomialExtensionField, AbstractExtensionField};
     use rand::{thread_rng, Rng};
 
     use super::*;
@@ -123,5 +124,74 @@ mod tests {
         reverse_slice_index_bits(&mut folded);
 
         assert_eq!(expected, folded);
+    }
+
+    #[test]
+    fn test_fold_bitcoin_script() {
+        use p3_field::AbstractField;
+        type AF= BabyBear;
+        type F = BinomialExtensionField<BabyBear,4>;
+
+        let mut rng = thread_rng();
+        let log_n = 4;
+        let n = 1 << log_n;
+        let coeffs = (0..n).map(|i: u32| F::from_base_fn(|i|{rng.gen::<F>()})).collect::<Vec<_>>();
+
+        let dft = Radix2Dit::default();
+        let evals = dft.dft(coeffs.clone());
+
+        let even_coeffs = coeffs.iter().cloned().step_by(2).collect_vec();
+        let even_evals = dft.dft(even_coeffs);
+
+        let odd_coeffs = coeffs.iter().cloned().skip(1).step_by(2).collect_vec();
+        let odd_evals = dft.dft(odd_coeffs);
+
+        let beta = F::from_base_slice(vec![AF::from_canonical_u32(2);4].as_slice());
+        let expected = izip!(even_evals, odd_evals)
+            .map(|(even, odd)| even + beta * odd)
+            .collect::<Vec<_>>();
+
+        // println!("{:?}", evals);
+        // println!("------- folding -------");
+        // println!("{:?}", expected);
+
+        
+        // fold_even_odd takes and returns in bitrev order.
+        let mut folded = evals.clone();
+        reverse_slice_index_bits(&mut folded);
+        folded = fold_even_odd(folded, beta);
+        reverse_slice_index_bits(&mut folded);
+
+        assert_eq!(expected, folded);
+
+        for (index, log_n) in vec![4].iter().enumerate() {
+            let n = 1 << log_n;
+            let y0 = evals.clone();
+            let y1 = expected.clone();
+
+
+            let subgroup_generator = F::two_adic_generator(*log_n);
+
+            for j in 0..n as usize {
+                let x_index = j;
+                let x_nge_index = (n / 2 + x_index) % n;
+                let x = subgroup_generator.exp_u64(x_index as u64);
+                let y0_x = y0[x_index];
+                let y0_neg_x = y0[x_nge_index];
+                let y_1_x_quare = y1[x_index % (n / 2)];
+                let script = ext_fold_degree1::<BabyBear4,BabyBear>(
+                    2,
+                    x.as_base_slice(),
+                    y0_x.as_base_slice(),
+                    y0_neg_x.as_base_slice(),
+                    beta.as_base_slice(),
+                    y_1_x_quare.as_base_slice(),
+                );
+
+                let result = execute_script(script);
+                assert!(result.success);
+            }
+        }
+
     }
 }

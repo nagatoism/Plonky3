@@ -87,6 +87,26 @@ mod test {
         };
         let exec_result = execute_script(script);
         assert!(exec_result.success);
+
+        let script = script! {
+            for i in (0..4).rev(){
+                {a[i].as_canonical_u32()}
+            }
+            for i in (0..4).rev(){
+                {b[i].as_canonical_u32()}
+            }
+
+            { u31ext_add::<BabyBear4>() }
+
+            for i in (0..4).rev(){
+                {c[i].as_canonical_u32()}
+            }
+
+            { u31ext_equalverify::<BabyBear4>() }
+            OP_PUSHNUM_1
+        };
+        let exec_result = execute_script(script);
+        assert!(exec_result.success);
     }
 
     #[test]
