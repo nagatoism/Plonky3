@@ -56,8 +56,8 @@ impl<'a, const NUM_POLY: usize, F: NativeField> VerifyFoldingLeaf<'a, NUM_POLY, 
 
     pub fn check_equal_script(&self) -> Script {
         script! {
-            for i in 0..N0/2{
-                {self.y_0_x_commitment.commit_message[ N0 / 2 - 1 - i]} OP_EQUALVERIFY
+            for i in 0..F::N0/2{
+                {self.y_0_x_commitment.commit_message[ F::N0 / 2 - 1 - i]} OP_EQUALVERIFY
             }
         }
     }
@@ -205,57 +205,56 @@ impl<const NUM_POLY: usize, F: NativeField> EvaluationLeaf<NUM_POLY, F> {
 
 pub struct BitCommitment<F: NativeField> {
     origin_value: u32,
-    secret_key: String,
-    message: [u8; N0 as usize], // every u8 only available for 4-bits
-    commit_message: [u8; N0 / 2 as usize],
-    pubkey: Vec<Vec<u8>>,
+    winter: Winternitz<F>,
+    // secret_key: String,
+    message: Vec<u8>, // every u8 only available for 4-bits
+    commit_message: Vec<u8>,
+    // pubkey: Vec<Vec<u8>>,
     _marker: PhantomData<F>,
 }
 
 impl<F: NativeField> BitCommitment<F> {
     pub fn new(secret_key: String, origin_value: F) -> Self {
         let origin_value = origin_value.as_u32();
-        let message = to_digits::<N0>(origin_value);
-        let mut commit_message = [0; N0 / 2];
-        for i in 0..N0 / 2 {
-            let index = N0 / 2 - 1 - i;
+        let winter = Winternitz::<F>::new(&secret_key);
+        let message = to_digits(origin_value, F::N0);
+
+        let mut commit_message = vec![0u8; F::N0 / 2];
+        for i in 0..F::N0 / 2 {
+            let index = F::N0 / 2 - 1 - i;
             commit_message[i] = message[2 * index] ^ (message[2 * index + 1] << 4);
-        }
-        let mut pubkey = Vec::new();
-        for i in 0..N {
-            pubkey.push(public_key(&secret_key, i as u32));
         }
         Self {
             origin_value,
-            secret_key,
+            winter,
             message,
             commit_message,
-            pubkey,
             _marker: PhantomData,
         }
     }
 
     pub fn check_equal_script(&self) -> Script {
         script! {
-            for i in 0..N0/2{
-                {self.commit_message[ N0 / 2 - 1 - i]} OP_EQUALVERIFY
+            for i in 0..F::N0/2{
+                {self.commit_message[ F::N0 / 2 - 1 - i]} OP_EQUALVERIFY
             }
         }
     }
 
     pub fn check_equal_x_or_neg_x_script(&self, neg_x: &BitCommitment<F>) -> Script {
         script! {
-            for i in 0..N0/2{
+            for i in 0..F::N0/2{
                 OP_DUP
-                {self.commit_message[ N0 / 2 - 1 - i]} OP_EQUAL OP_SWAP
-                {neg_x.commit_message[ N0 / 2 - 1 - i]} OP_EQUAL OP_ADD
+                {self.commit_message[ F::N0 / 2 - 1 - i]} OP_EQUAL OP_SWAP
+                {neg_x.commit_message[ F::N0 / 2 - 1 - i]} OP_EQUAL OP_ADD
                 OP_1 OP_EQUALVERIFY
             }
         }
     }
 
     pub fn checksig_verify_script(&self) -> Script {
-        checksig_verify(self.pubkey.as_slice())
+        self.winter
+            .checksig_verify(self.winter.pub_key().as_slice())
     }
 
     // signuture is the input of this script
@@ -267,11 +266,11 @@ impl<F: NativeField> BitCommitment<F> {
     }
 
     pub fn signature_script(&self) -> Script {
-        sign_script(&self.secret_key, self.message)
+        self.winter.sign_script(&self.message)
     }
 
     pub fn signature(&self) -> Vec<Vec<u8>> {
-        let mut sig = sign(&self.secret_key, self.message);
+        let mut sig = self.winter.sign(&self.message);
         for i in 0..sig.len() {
             if sig[i].len() == 1 && sig[i][0] == 0 {
                 sig[i] = vec![]

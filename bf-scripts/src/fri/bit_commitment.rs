@@ -64,47 +64,43 @@ pub const N_INS: usize = N0_INS + N1_INS;
 //
 // Helper functions
 //
-pub struct Winternitz<F:NativeField>{
+pub struct Winternitz<F: NativeField> {
     secret_key: String,
+    pub_key: Vec<Vec<u8>>,
     _marker: PhantomData<F>,
 }
 
-impl<F:NativeField>  Winternitz<F>{
-    pub fn new(secret_key: &str) -> Self{
-        Self{
-            secret_key:String::from(secret_key),
-            _marker:PhantomData,
+impl<F: NativeField> Winternitz<F> {
+    pub fn new(secret_key: &str) -> Self {
+        let mut pubkey = Vec::new();
+        for i in 0..F::N {
+            pubkey.push(generate_public_key(&secret_key, i as u32));
+        }
+        Self {
+            secret_key: String::from(secret_key),
+            pub_key: pubkey,
+            _marker: PhantomData,
         }
     }
 
-        /// Generate the public key for the i-th digit of the message
-    pub fn public_key(&self, digit_index: u32) -> Vec<u8> {
-        // Convert secret_key from hex string to bytes
-        let mut secret_i = match hex_decode(&self.secret_key) {
-            Ok(bytes) => bytes,
-            Err(_) => panic!("Invalid hex string"),
-        };
+    /// Generate the public key for the i-th digit of the message
+    pub fn public_key(&self, digit_index: u32) -> &Vec<u8> {
+        &self.pub_key[digit_index as usize]
+    }
 
-        secret_i.push(digit_index as u8);
-
-        let mut hash = hash160::Hash::hash(&secret_i);
-
-        for _ in 0..D {
-            hash = hash160::Hash::hash(&hash[..]);
-        }
-
-        hash.as_byte_array().to_vec()
+    pub fn pub_key(&self) -> &Vec<Vec<u8>> {
+        &self.pub_key
     }
 
     pub fn public_key_script(&self, digit_index: u32) -> Script {
-        let hash_bytes = self.public_key( digit_index);
-    
+        let hash_bytes = self.public_key(digit_index).clone();
+
         script! {
             { hash_bytes }
         }
     }
 
-        /// Compute the signature for the i-th digit of the message
+    /// Compute the signature for the i-th digit of the message
     pub fn digit_signature(&self, digit_index: u32, message_digit: u8) -> (Vec<u8>, u8) {
         // Convert secret_key from hex string to bytes
         let mut secret_i = match hex_decode(&self.secret_key) {
@@ -126,7 +122,7 @@ impl<F:NativeField>  Winternitz<F>{
     }
 
     /// Compute the signature for the i-th digit of the message
-    pub fn digit_signature_script(&self,digit_index: u32, message_digit: u8) -> Script {
+    pub fn digit_signature_script(&self, digit_index: u32, message_digit: u8) -> Script {
         // Convert secret_key from hex string to bytes
         let (hash_bytes, message_digit) = self.digit_signature(digit_index, message_digit);
 
@@ -138,8 +134,8 @@ impl<F:NativeField>  Winternitz<F>{
 
     /// Compute the checksum of the message's digits.
     /// Further infos in chapter "A domination free function for Winternitz signatures"
-    pub fn checksum(&self,digits: &[u8]) -> u32 {
-        assert_eq!(digits.len(),F::N0);
+    pub fn checksum(&self, digits: &[u8]) -> u32 {
+        assert_eq!(digits.len(), F::N0);
         let mut sum = 0;
         for digit in digits {
             sum += *digit as u32;
@@ -147,28 +143,28 @@ impl<F:NativeField>  Winternitz<F>{
         D * F::N0 as u32 - sum
     }
 
-        /// Convert a number to digits
-    pub fn to_digits(&self,mut number: u32) -> Vec<u8>{
-        let mut digits:Vec<u8> = Vec::new();
-        for i in 0..F::N1 {
-            let digit = number % (D + 1);
-            number = (number - digit) / (D + 1);
-            digits.push(digit as u8);
-        }
-        digits
-    }
-
+    //     /// Convert a number to digits
+    // pub fn to_digits(&self,mut number: u32) -> Vec<u8>{
+    //     let mut digits:Vec<u8> = Vec::new();
+    //     for i in 0..F::N1 {
+    //         let digit = number % (D + 1);
+    //         number = (number - digit) / (D + 1);
+    //         digits.push(digit as u8);
+    //     }
+    //     digits
+    // }
 
     /// Compute the signature for a given message
-    pub fn sign(&self,  message_digits: &[u8]) -> Vec<Vec<u8>> {
+    pub fn sign(&self, message_digits: &[u8]) -> Vec<Vec<u8>> {
         // if the message is [1, 2, 3, 4, 5, 6, 7, 8]; checksum=36 120-36=84(0101,0100)[5,4]
         // but the checksum_digits here has been reverse into [4,5]
-        let mut checksum_digits = self.to_digits(self.checksum(message_digits)).to_vec();
+        let mut checksum_digits = to_digits(self.checksum(message_digits), F::N1);
         checksum_digits.append(&mut message_digits.to_vec());
 
         let mut signature: Vec<Vec<u8>> = Vec::new();
         for i in 0..F::N {
-            let (hash, digit) = self.digit_signature( i as u32, checksum_digits[(F::N - 1 - i) as usize]);
+            let (hash, digit) =
+                self.digit_signature(i as u32, checksum_digits[(F::N - 1 - i) as usize]);
             signature.push(hash); // The reason why reverse order is used here is because it needs to be pushed onto the stack
             signature.push(vec![digit]);
         }
@@ -179,7 +175,7 @@ impl<F:NativeField>  Winternitz<F>{
     /// Compute the signature for a given message
     pub fn sign_script(&self, message_digits: &[u8]) -> Script {
         // const message_digits = to_digits(message, n0)
-        let mut checksum_digits = self.to_digits(self.checksum(message_digits)).to_vec();
+        let mut checksum_digits = to_digits(self.checksum(message_digits), F::N1);
         checksum_digits.append(&mut message_digits.to_vec());
 
         script! {
@@ -191,7 +187,7 @@ impl<F:NativeField>  Winternitz<F>{
         }
     }
 
-    pub fn checksig_verify(&self,pub_key: &[Vec<u8>]) -> Script {
+    pub fn checksig_verify(&self, pub_key: &[Vec<u8>]) -> Script {
         // If the mssage splits as  [A,B,C,D] [checkum_digit1,checksum_digit2]
         // The following input signature looks like:
         // {A_sig Hash}, {A digit}, {A_sig Hash}, {B digit}, {B_sig Hash}, {C digit}, {C_sig Hash}, {D digit}, {D_sig Hash},
@@ -209,41 +205,41 @@ impl<F:NativeField>  Winternitz<F>{
             //
             // Verify the hash chain for each digit
             //
-    
+
             // Repeat this for every of the n many digits
             for digit_index in 0..F::N {
                 // Verify that the digit is in the range [0, d]
                 // See https://github.com/BitVM/BitVM/issues/35
                 { D }
                 OP_MIN // Return the smaller number
-    
+
                 // Push two copies of the digit onto the altstack
                 OP_DUP
                 OP_TOALTSTACK
                 OP_TOALTSTACK
-    
+
                 // Hash the input hash d times and put every result on the stack
                 for _ in 0..D {
                     OP_DUP OP_HASH160
                 }
-    
+
                 // Verify the signature for this digit
                 OP_FROMALTSTACK
                 OP_PICK
                 { pub_key[(F::N - 1 - digit_index) as usize].clone() }
                 OP_EQUALVERIFY
-    
+
                 // Drop the d+1 stack items
                 for _ in 0..(D+1)/2 {
                     OP_2DROP
                 }
             }
-    
-    
+
+
             //
             // Verify the Checksum
             //
-    
+
             // 1. Compute the checksum of the message's digits
             OP_FROMALTSTACK OP_DUP OP_NEGATE
             for _ in 1..F::N0 {
@@ -251,8 +247,8 @@ impl<F:NativeField>  Winternitz<F>{
             }
             { D * F::N0 as u32 }
             OP_ADD
-    
-    
+
+
             // 2. Sum up the signed checksum's digits
             OP_FROMALTSTACK
             for _ in 0..F::N1 - 1 {
@@ -262,11 +258,11 @@ impl<F:NativeField>  Winternitz<F>{
                 OP_FROMALTSTACK
                 OP_ADD
             }
-    
+
             // 3. Ensure both checksums are equal
             OP_EQUALVERIFY
-    
-    
+
+
             // Convert the message's digits to bytes
             for i in 0..F::N0 / 2 {
                 OP_SWAP
@@ -283,29 +279,28 @@ impl<F:NativeField>  Winternitz<F>{
             for _ in 0..F::N0 / 2 - 1{
                 OP_FROMALTSTACK
             }
-    
+
         }
     }
-        
 }
-// /// Generate the public key for the i-th digit of the message
-// pub fn public_key(secret_key: &str, digit_index: u32) -> Vec<u8> {
-//     // Convert secret_key from hex string to bytes
-//     let mut secret_i = match hex_decode(secret_key) {
-//         Ok(bytes) => bytes,
-//         Err(_) => panic!("Invalid hex string"),
-//     };
+/// Generate the public key for the i-th digit of the message
+pub fn generate_public_key(secret_key: &str, digit_index: u32) -> Vec<u8> {
+    // Convert secret_key from hex string to bytes
+    let mut secret_i = match hex_decode(secret_key) {
+        Ok(bytes) => bytes,
+        Err(_) => panic!("Invalid hex string"),
+    };
 
-//     secret_i.push(digit_index as u8);
+    secret_i.push(digit_index as u8);
 
-//     let mut hash = hash160::Hash::hash(&secret_i);
+    let mut hash = hash160::Hash::hash(&secret_i);
 
-//     for _ in 0..D {
-//         hash = hash160::Hash::hash(&hash[..]);
-//     }
+    for _ in 0..D {
+        hash = hash160::Hash::hash(&hash[..]);
+    }
 
-//     hash.as_byte_array().to_vec()
-// }
+    hash.as_byte_array().to_vec()
+}
 
 // /// Generate the public key for the i-th digit of the message
 // pub fn public_key_script(secret_key: &str, digit_index: u32) -> Script {
@@ -358,16 +353,16 @@ impl<F:NativeField>  Winternitz<F>{
 //     D * N0 as u32 - sum
 // }
 
-// /// Convert a number to digits
-// pub fn to_digits<const DIGIT_COUNT: usize>(mut number: u32) -> [u8; DIGIT_COUNT] {
-//     let mut digits: [u8; DIGIT_COUNT] = [0; DIGIT_COUNT];
-//     for i in 0..DIGIT_COUNT {
-//         let digit = number % (D + 1);
-//         number = (number - digit) / (D + 1);
-//         digits[i] = digit as u8;
-//     }
-//     digits
-// }
+/// Convert a number to digits
+pub fn to_digits(mut number: u32, digit_count: usize) -> Vec<u8> {
+    let mut digits = vec![0u8; digit_count];
+    for i in 0..digit_count {
+        let digit = number % (D + 1);
+        number = (number - digit) / (D + 1);
+        digits[i] = digit as u8;
+    }
+    digits
+}
 
 // /// Compute the signature for a given message
 // pub fn sign<const N0:usize,const N1:usize,const N:usize>(secret_key: &str, message_digits: [u8; N0]) -> Vec<Vec<u8>> {
@@ -450,7 +445,6 @@ impl<F:NativeField>  Winternitz<F>{
 //             }
 //         }
 
-
 //         //
 //         // Verify the Checksum
 //         //
@@ -462,7 +456,6 @@ impl<F:NativeField>  Winternitz<F>{
 //         }
 //         { D * N0 as u32 }
 //         OP_ADD
-
 
 //         // 2. Sum up the signed checksum's digits
 //         OP_FROMALTSTACK
@@ -476,7 +469,6 @@ impl<F:NativeField>  Winternitz<F>{
 
 //         // 3. Ensure both checksums are equal
 //         OP_EQUALVERIFY
-
 
 //         // Convert the message's digits to bytes
 //         for i in 0..N0 / 2 {
@@ -521,9 +513,9 @@ mod test {
         let winter = Winternitz::<BabyBear>::new("1234");
         let message_digits: [u8; N0_INS as usize] = [1, 2, 3, 4, 5, 6, 7, 8];
         // if the message is [1, 2, 3, 4, 5, 6, 7, 8]; checksum=36 120-36=84(0101,0100)[5,4]
-        let sum =  winter.checksum(&message_digits);
+        let sum = winter.checksum(&message_digits);
         assert_eq!(sum, 84);
-        let checksum_digits = winter.to_digits(winter.checksum(&message_digits)).to_vec();
+        let checksum_digits = to_digits(winter.checksum(&message_digits), BabyBear::N1).to_vec();
         assert_eq!(checksum_digits, vec![4, 5]);
     }
 
@@ -533,13 +525,14 @@ mod test {
         // for the u8 resprentation [0x87,0x65,0x43,0x21]
         let winter = Winternitz::<BabyBear>::new("1234");
         let origin_value: u32 = 0x87654321;
-        let message = winter.to_digits(origin_value);
+        // let message = winter.to_digits(origin_value);
+        let message = to_digits(origin_value, BabyBear::N0);
         const MESSAGE: [u8; N0_INS as usize] = [1, 2, 3, 4, 5, 6, 7, 8];
         assert_eq!(message, MESSAGE);
 
         let mut pubkey = Vec::new();
         for i in 0..N_INS {
-            pubkey.push(winter.public_key( i as u32));
+            pubkey.push(winter.public_key(i as u32).clone());
         }
 
         let script = script! {
@@ -561,18 +554,18 @@ mod test {
 
         // test zero case
         let origin_value: u32 = 0xED65002F;
-        let message = winter.to_digits(origin_value);
+        let message = to_digits(origin_value, BabyBear::N0);
         const MESSAGE_1: [u8; N0_INS as usize] = [0xF, 2, 0, 0, 5, 6, 0xD, 0xE];
         assert_eq!(message, MESSAGE_1);
 
-        let mut pubkey = Vec::new();
-        for i in 0..N_INS {
-            pubkey.push(public_key(i as u32));
-        }
+        // let mut pubkey = Vec::new();
+        // for i in 0..N_INS {
+        //     pubkey.push(public_key(i as u32));
+        // }
 
         let script = script! {
             { winter.sign_script(& MESSAGE_1) } // digit 0 = [checkum hash_i]
-            { winter.checksig_verify(pubkey.as_slice()) }// using secret key to generate pubkey
+            { winter.checksig_verify(winter.pub_key.as_slice()) }// using secret key to generate pubkey
 
             0x2F OP_EQUALVERIFY
             0x00 OP_EQUALVERIFY
@@ -598,11 +591,11 @@ mod test {
 
         let mut pubkey = Vec::new();
         for i in 0..N_INS {
-            pubkey.push( winter.public_key( i as u32));
+            pubkey.push(winter.public_key(i as u32));
         }
 
         let script = script! {
-            { winter.checksig_verify(pubkey.as_slice()) }// using secret key to generate pubkey
+            { winter.checksig_verify(winter.pub_key().as_slice()) }// using secret key to generate pubkey
 
             0x21 OP_EQUALVERIFY
             0x43 OP_EQUALVERIFY
@@ -616,7 +609,7 @@ mod test {
             script.as_bytes().len()
         );
 
-        let sig0 = sign::<N0_INS,N1_INS,N_INS>(MY_SECKEY, MESSAGE);
+        let sig0 = winter.sign(&MESSAGE);
         let exec_result = execute_script_with_inputs(script, sig0.clone());
         assert!(exec_result.success);
 
@@ -625,11 +618,11 @@ mod test {
 
         let mut pubkey = Vec::new();
         for i in 0..N_INS {
-            pubkey.push( winter.public_key( i as u32));
+            pubkey.push(winter.public_key(i as u32));
         }
 
         let script = script! {
-            {  winter.checksig_verify(pubkey.as_slice()) }// using secret key to generate pubkey
+            {  winter.checksig_verify(winter.pub_key.as_slice()) }// using secret key to generate pubkey
 
             0xBA OP_EQUALVERIFY
             0xDC OP_EQUALVERIFY
@@ -643,7 +636,7 @@ mod test {
             script.as_bytes().len()
         );
 
-        let mut sig1 =  winter.sign(&MESSAGE_1);
+        let mut sig1 = winter.sign(&MESSAGE_1);
         for i in 0..sig1.len() {
             if sig1[i].len() == 1 && sig1[i][0] == 0 {
                 sig1[i] = vec![]
@@ -657,11 +650,11 @@ mod test {
 
         let mut pubkey = Vec::new();
         for i in 0..N_INS {
-            pubkey.push( winter.public_key( i as u32));
+            pubkey.push(winter.public_key(i as u32));
         }
 
         let script = script! {
-            {  winter.checksig_verify(pubkey.as_slice()) }// using secret key to generate pubkey
+            {  winter.checksig_verify(winter.pub_key.as_slice()) }// using secret key to generate pubkey
 
             0xBA OP_EQUALVERIFY
             0x00 OP_EQUALVERIFY
@@ -675,7 +668,7 @@ mod test {
             script.as_bytes().len()
         );
 
-        let mut sig =  winter.sign(& MESSAGE_2);
+        let mut sig = winter.sign(&MESSAGE_2);
         for i in 0..sig.len() {
             if sig[i].len() == 1 && sig[i][0] == 0 {
                 sig[i] = vec![]

@@ -6,9 +6,9 @@ pub trait NativeField:
 {
     const BIS_SIZE: usize;
     const MOD: u32;
-    const N0:usize;
-    const N1:usize;
-    const N:usize;
+    const N0: usize;
+    const N1: usize;
+    const N: usize;
     fn as_u32(&self) -> u32 {
         self.as_canonical_u32()
     }
@@ -41,9 +41,9 @@ pub trait NativeField:
 impl NativeField for BabyBear {
     const BIS_SIZE: usize = 32;
     const MOD: u32 = 0x78000001;
-    const N:usize = 10;
-    const N0:usize = 8;
-    const N1:usize = 2;
+    const N: usize = 10;
+    const N0: usize = 8;
+    const N1: usize = 2;
 }
 
 mod tests {

@@ -12,7 +12,7 @@ pub use m31::*;
 mod babybear;
 pub use babybear::BabyBearU31;
 
-use crate::fri::bit_commitment::{LOG_D_usize, D, LOG_D, N, N0, N1};
+use crate::fri::bit_commitment::{LOG_D_usize, D, LOG_D, N0_INS as N0, N1_INS as N1, N_INS as N};
 
 pub trait U31Config {
     const MOD: u32;

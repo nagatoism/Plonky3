@@ -1,3 +1,4 @@
+// #![feature(generic_const_exprs)]
 use bitcoin::blockdata::transaction;
 use bitcoin::blockdata::transaction::Transaction;
 use bitcoin::hashes::Hash;
@@ -17,6 +18,7 @@ mod u32;
 pub use u32::*;
 
 pub mod pseudo;
+
 define_pushable!();
 
 #[allow(dead_code)]
