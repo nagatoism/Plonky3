@@ -38,17 +38,6 @@ use hex::decode as hex_decode;
 //    HASH_255(HASH_1(A)) ==  Hash_256(A) HASH_254(HASH_2(B)) == HASH_256(B) HASH_253(HASH_3(C)) == HASH_256(C) HASH_252(HASH_4(D)) == HASH_256(D)
 //    reveal preiamge for checksum and must to equal to 10
 
-// /// Bits per digit
-// const LOG_D: u32 = 4;
-// /// Digits are base d+1
-// pub const D: u32 = (1 << LOG_D) - 1;
-// /// Number of digits of the message (20x15=300 checksum need 9bits)
-// pub const N0: u32 = 20;
-// /// Number of digits of the checksum
-// pub const N1: usize = 4;
-// /// Total number of digits to be signed
-// pub const N: u32 = N0 + N1 as u32;
-
 /// Bits per digit
 pub const LOG_D: u32 = 4;
 pub const LOG_D_usize: usize = 4;

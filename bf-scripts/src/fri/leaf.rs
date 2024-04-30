@@ -13,26 +13,27 @@ use bitcoin::opcodes::{OP_EQUAL, OP_EQUALVERIFY, OP_SWAP};
 use bitcoin::ScriptBuf as Script;
 use bitcoin_script::{define_pushable, script};
 
-use super::bit_commitment::*;
+use super::bitcom::*;
+use super::winternitz::*;
 use super::NativeField;
 use crate::{fold_degree, BabyBearU31};
 define_pushable!();
 
 pub struct VerifyFoldingLeaf<'a, const NUM_POLY: usize, F: NativeField> {
     x: F,
-    beta: &'a BitCommitment<F>,
-    y_0_x_commitment: &'a BitCommitment<F>,
-    y_0_neg_x_commitment: &'a BitCommitment<F>,
-    y_1_x_square_commitment: &'a BitCommitment<F>,
+    beta: &'a BitCommit<F>,
+    y_0_x_commitment: &'a BitCommit<F>,
+    y_0_neg_x_commitment: &'a BitCommit<F>,
+    y_1_x_square_commitment: &'a BitCommit<F>,
 }
 
 impl<'a, const NUM_POLY: usize, F: NativeField> VerifyFoldingLeaf<'a, NUM_POLY, F> {
     fn new(
         x: F,
-        beta: &'a BitCommitment<F>,
-        y_0_x_commitment: &'a BitCommitment<F>,
-        y_0_neg_x_commitment: &'a BitCommitment<F>,
-        y_1_x_square_commitment: &'a BitCommitment<F>,
+        beta: &'a BitCommit<F>,
+        y_0_x_commitment: &'a BitCommit<F>,
+        y_0_neg_x_commitment: &'a BitCommit<F>,
+        y_1_x_square_commitment: &'a BitCommit<F>,
     ) -> Self {
         VerifyFoldingLeaf {
             x,
@@ -57,7 +58,7 @@ impl<'a, const NUM_POLY: usize, F: NativeField> VerifyFoldingLeaf<'a, NUM_POLY, 
     pub fn check_equal_script(&self) -> Script {
         script! {
             for i in 0..F::N0/2{
-                {self.y_0_x_commitment.commit_message[ F::N0 / 2 - 1 - i]} OP_EQUALVERIFY
+                {self.y_0_x_commitment.commit_u32_as_4bytes()[ F::N0 / 2 - 1 - i]} OP_EQUALVERIFY
             }
         }
     }
@@ -102,16 +103,14 @@ impl<F: NativeField> TwoPointsLeaf<F> {
 pub struct Point<F: NativeField> {
     x: F,
     y: F,
-    x_commit: BitCommitment<F>,
-    y_commit: BitCommitment<F>,
+    x_commit: BitCommit<F>,
+    y_commit: BitCommit<F>,
 }
 
 impl<F: NativeField> Point<F> {
     pub fn new(x: F, y: F) -> Point<F> {
-        let x_commit =
-            BitCommitment::new("b138982ce17ac813d505b5b40b665d404e9528e8".to_string(), x);
-        let y_commit =
-            BitCommitment::new("b138982ce17ac813d505b5b40b665d404e9528e8".to_string(), y);
+        let x_commit = BitCommit::new("b138982ce17ac813d505b5b40b665d404e9528e8".to_string(), x);
+        let y_commit = BitCommit::new("b138982ce17ac813d505b5b40b665d404e9528e8".to_string(), y);
         Self {
             x: x,
             y: y,
@@ -123,9 +122,9 @@ impl<F: NativeField> Point<F> {
     pub fn commit_script(&self) -> Script {
         let scripts = script! {
             { self.x_commit.checksig_verify_script() }
-            { self.x_commit.check_equal_script() }
+            { self.x_commit.commit_u32_as_4bytes_script() }
             { self.y_commit.checksig_verify_script() }
-            { self.y_commit.check_equal_script() }
+            { self.y_commit.commit_u32_as_4bytes_script() }
         };
 
         scripts
@@ -135,10 +134,10 @@ impl<F: NativeField> Point<F> {
 pub struct EvaluationLeaf<const NUM_POLY: usize, F: NativeField> {
     leaf_index: usize,
     x: F,
-    x_commitment: BitCommitment<F>,
-    neg_x_commitment: BitCommitment<F>,
+    x_commitment: BitCommit<F>,
+    neg_x_commitment: BitCommit<F>,
     evaluations: Vec<F>,
-    evaluations_commitments: Vec<BitCommitment<F>>,
+    evaluations_commitments: Vec<BitCommit<F>>,
 }
 
 impl<const NUM_POLY: usize, F: NativeField> EvaluationLeaf<NUM_POLY, F> {
@@ -146,14 +145,14 @@ impl<const NUM_POLY: usize, F: NativeField> EvaluationLeaf<NUM_POLY, F> {
         assert_eq!(evaluations.len(), NUM_POLY);
 
         let x_commitment =
-            BitCommitment::new("b138982ce17ac813d505b5b40b665d404e9528e8".to_string(), x);
-        let neg_x_commitment = BitCommitment::new(
+            BitCommit::new("b138982ce17ac813d505b5b40b665d404e9528e8".to_string(), x);
+        let neg_x_commitment = BitCommit::new(
             "b138982ce17ac813d505b5b40b665d404e9528e8".to_string(),
             F::field_mod() - x,
         );
         let mut evaluations_commitments = Vec::new();
         for i in 0..NUM_POLY {
-            evaluations_commitments.push(BitCommitment::new(
+            evaluations_commitments.push(BitCommit::new(
                 "b138982ce17ac813d505b5b40b665d404e9528e9".to_string(),
                 evaluations[i],
             ));
@@ -173,11 +172,11 @@ impl<const NUM_POLY: usize, F: NativeField> EvaluationLeaf<NUM_POLY, F> {
         // equal to x script
         let scripts = script! {
             { self.x_commitment.checksig_verify_script() }
-            { self.x_commitment.check_equal_script() }
+            { self.x_commitment.commit_u32_as_4bytes_script() }
             // todo: calculate to equal to -x
             for i in 0..NUM_POLY{
                 { self.evaluations_commitments[NUM_POLY-1-i].checksig_verify_script() }
-                { self.evaluations_commitments[NUM_POLY-1-i].check_equal_script() }
+                { self.evaluations_commitments[NUM_POLY-1-i].commit_u32_as_4bytes_script() }
             }
             OP_1
         };
@@ -189,94 +188,17 @@ impl<const NUM_POLY: usize, F: NativeField> EvaluationLeaf<NUM_POLY, F> {
         // equal to x script
         let scripts = script! {
             { self.x_commitment.checksig_verify_script() }
-            { self.x_commitment.check_equal_script() }
+            { self.x_commitment.commit_u32_as_4bytes_script() }
             { self.neg_x_commitment.checksig_verify_script() }
-            { self.neg_x_commitment.check_equal_script() }
+            { self.neg_x_commitment.commit_u32_as_4bytes_script() }
             for i in 0..NUM_POLY{
                 { self.evaluations_commitments[NUM_POLY-1-i].checksig_verify_script() }
-                { self.evaluations_commitments[NUM_POLY-1-i].check_equal_script() }
+                { self.evaluations_commitments[NUM_POLY-1-i].commit_u32_as_4bytes_script() }
             }
             OP_1
         };
 
         scripts
-    }
-}
-
-pub struct BitCommitment<F: NativeField> {
-    origin_value: u32,
-    winter: Winternitz<F>,
-    // secret_key: String,
-    message: Vec<u8>, // every u8 only available for 4-bits
-    commit_message: Vec<u8>,
-    // pubkey: Vec<Vec<u8>>,
-    _marker: PhantomData<F>,
-}
-
-impl<F: NativeField> BitCommitment<F> {
-    pub fn new(secret_key: String, origin_value: F) -> Self {
-        let origin_value = origin_value.as_u32();
-        let winter = Winternitz::<F>::new(&secret_key);
-        let message = to_digits(origin_value, F::N0);
-
-        let mut commit_message = vec![0u8; F::N0 / 2];
-        for i in 0..F::N0 / 2 {
-            let index = F::N0 / 2 - 1 - i;
-            commit_message[i] = message[2 * index] ^ (message[2 * index + 1] << 4);
-        }
-        Self {
-            origin_value,
-            winter,
-            message,
-            commit_message,
-            _marker: PhantomData,
-        }
-    }
-
-    pub fn check_equal_script(&self) -> Script {
-        script! {
-            for i in 0..F::N0/2{
-                {self.commit_message[ F::N0 / 2 - 1 - i]} OP_EQUALVERIFY
-            }
-        }
-    }
-
-    pub fn check_equal_x_or_neg_x_script(&self, neg_x: &BitCommitment<F>) -> Script {
-        script! {
-            for i in 0..F::N0/2{
-                OP_DUP
-                {self.commit_message[ F::N0 / 2 - 1 - i]} OP_EQUAL OP_SWAP
-                {neg_x.commit_message[ F::N0 / 2 - 1 - i]} OP_EQUAL OP_ADD
-                OP_1 OP_EQUALVERIFY
-            }
-        }
-    }
-
-    pub fn checksig_verify_script(&self) -> Script {
-        self.winter
-            .checksig_verify(self.winter.pub_key().as_slice())
-    }
-
-    // signuture is the input of this script
-    pub fn complete_script(&self) -> Script {
-        script! {
-            {self.checksig_verify_script()}
-            {self.check_equal_script()}
-        }
-    }
-
-    pub fn signature_script(&self) -> Script {
-        self.winter.sign_script(&self.message)
-    }
-
-    pub fn signature(&self) -> Vec<Vec<u8>> {
-        let mut sig = self.winter.sign(&self.message);
-        for i in 0..sig.len() {
-            if sig[i].len() == 1 && sig[i][0] == 0 {
-                sig[i] = vec![]
-            }
-        }
-        sig
     }
 }
 
@@ -323,60 +245,8 @@ mod test {
     }
 
     #[test]
-    fn test_bit_commitment_scripts() {
-        let x_commitment = BitCommitment::new("0000".to_string(), BabyBear::from_u32(0x11654321));
-        assert_eq!(x_commitment.commit_message, [0x11, 0x65, 0x43, 0x21]);
-        // println!("{:?}",x_commitment.commit_message);
-
-        let check_equal_script = x_commitment.check_equal_script();
-        // println!("{:?}", check_equal_script);
-
-        let expect_script = script! {
-            0x21 OP_EQUALVERIFY
-            0x43 OP_EQUALVERIFY
-            0x65 OP_EQUALVERIFY
-            0x11 OP_EQUALVERIFY
-        };
-        // println!("{:}",expect_script);
-        assert_eq!(expect_script, check_equal_script);
-
-        // check signature and verify the value
-        let signature = x_commitment.signature();
-        let exec_scripts = script! {
-            { x_commitment.checksig_verify_script() }
-            { x_commitment.check_equal_script() }
-            OP_1
-        };
-        // println!("{:?}", exec_scripts);
-        let exec_result = execute_script_with_inputs(exec_scripts, signature);
-        assert!(exec_result.success);
-
-        for _ in 0..30 {
-            let mut rng = rand::thread_rng();
-            let random_number: u32 = rng.gen();
-            let n = random_number % BabyBear::MOD;
-
-            let x_commitment = BitCommitment::new(
-                "b138982ce17ac813d505b5b40b665d404e9528e8".to_string(),
-                BabyBear::from_u32(n),
-            );
-            println!("{:?}", x_commitment.commit_message);
-
-            let check_equal_script = x_commitment.check_equal_script();
-            println!("{:?}", check_equal_script);
-
-            // check signature and verify the value
-            let signature = x_commitment.signature();
-            let exec_scripts = script! {
-                { x_commitment.checksig_verify_script() }
-                { x_commitment.check_equal_script() }
-                OP_1
-            };
-            let exec_result = execute_script_with_inputs(exec_scripts, signature);
-            assert!(exec_result.success);
-        }
-
-        // test bitcommitment
+    fn test_u32_compress_to_bit_commit() {
+        use crate::u32::u32_std::{u32_compress, u32_push};
     }
 
     #[test]

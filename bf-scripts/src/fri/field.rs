@@ -1,4 +1,5 @@
 pub use p3_baby_bear::BabyBear;
+use p3_field::extension::BinomialExtensionField;
 use p3_field::{AbstractField, PrimeField, PrimeField32, TwoAdicField};
 use rand::Rng;
 pub trait NativeField:

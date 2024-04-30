@@ -1,6 +1,10 @@
-pub mod bit_commitment;
 pub mod leaf;
-pub use bit_commitment::*;
+pub mod winternitz;
 pub use leaf::*;
+pub use winternitz::*;
 pub mod field;
 pub use field::*;
+pub mod bitcom;
+pub use bitcom::*;
+pub mod bitcom_extension;
+pub use bitcom_extension::*;
