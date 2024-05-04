@@ -5,22 +5,45 @@ use p3_field::ExtensionField;
 
 use super::bitcom::*;
 use crate::fri::field::*;
+use crate::{u31ext_equalverify, BabyBear4};
 define_pushable!();
+// pub enum BitsCommitment<F: NativeField, EF: ExtensionField<F>>{
+//     Base(BitCommit<F>),
+//     Extension(BitCommitExtension<F,EF>),
+// }
 
-pub struct BitCommitExtension<F: NativeField, EF: ExtensionField<F>> {
+// pub fn new_bit_commit<F: BfBaseField, EF: BfExtensionField<F>>(secret: &str, value: impl Into<F> + Into<EF>) -> impl BitsCommitment{
+//     if let Some(value) = value.into().try_into() {
+//         BitCommit::<F>::new(secret, value)
+//     }
+
+//     BitCommit::<F>::new(secret, value)
+// }
+
+pub enum BitsCommitmentEnum<F: BfBaseField, EF: BfExtensionField<F>> {
+    Base(BitCommit<F>),
+    Extension(BitCommitExtension<F, EF>),
+}
+
+pub trait BitsCommitment {
+    fn recover_message_at_stack(&self) -> Script;
+    fn recover_message_at_altstack(&self) -> Script;
+    fn recover_message_euqal_to_commit_message(&self) -> Script;
+    fn signature(&self) -> Vec<Vec<u8>>;
+}
+
+pub struct BitCommitExtension<F: BfBaseField, EF: BfExtensionField<F>> {
     pub commit_message: EF,
     pub bit_commits: Vec<BitCommit<F>>,
     _marker: std::marker::PhantomData<EF>,
 }
 
-impl<F: NativeField, EF: ExtensionField<F>> BitCommitExtension<F, EF> {
-    fn new(secret: &str, value: EF) -> Self {
+impl<F: BfBaseField, EF: BfExtensionField<F>> BitCommitExtension<F, EF> {
+    pub fn new_from_bit_commits(value: EF, bcs: Vec<&BitCommit<F>>) -> BitCommitExtension<F, EF> {
         let mut bit_commits = Vec::new();
         for i in 0..EF::D {
-            // let secret_i = format!("{}{}",secret,i);
-            let secret_i = secret;
-            let bit_commit = BitCommit::new(secret_i.to_string(), value.as_base_slice()[i]);
-            bit_commits.push(bit_commit)
+            let bit_commit: BitCommit<F> = bcs[i].clone();
+            bit_commits.push(bit_commit);
         }
         Self {
             commit_message: value,
@@ -29,54 +52,24 @@ impl<F: NativeField, EF: ExtensionField<F>> BitCommitExtension<F, EF> {
         }
     }
 
-    pub fn recover_message_at_stack(&self) -> Script {
-        // we must confirm the stack state look like below after the inputs enter to match the complete_script:
-        // bit_commits[0].sig  <- top
-        // bit_commits[1].sig
-        //       ...
-        // bit_commits[N].sig
-        let script = script! {
-            for i in 0..(EF::D-1){
-                {self.bit_commits[i].complete_script()}
-                {self.bit_commits[i].origin_value}
-                OP_TOALTSTACK
-            }
-
-            {self.bit_commits[EF::D-1].complete_script()}
-            {self.bit_commits[EF::D-1].origin_value}
-
-            for _ in 0..EF::D-1{
-                OP_FROMALTSTACK
-            }
-            // The stake state looks like below:
-            // EF.slice(0)  <- top
-            // EF.slice(1)
-            //    ...
-            // EF.slice(EF::D-1)
-        };
-        script
+    pub fn new_from_base_slice(secret: &str, bs: &[F]) -> Self {
+        let value = EF::from_base_slice(bs);
+        Self::new(secret, value)
     }
 
-    pub fn recover_message_at_altstack(&self) -> Script {
-        /// we must confirm the stack state look like below after the inputs enter to match the recover_message_at_altstack:
-        // bit_commits[0].sig  <- top
-        // bit_commits[1].sig
-        //       ...
-        // bit_commits[N].sig
-        let script = script! {
-            for i in 0..EF::D{
-                {self.bit_commits[i].complete_script()}
-                {self.bit_commits[i].origin_value}
-                OP_TOALTSTACK
-            }
-
-            // The altstake state looks like below:
-            // EF.slice(EF::D-1)  <- top
-            // EF.slice(EF::D-2)
-            //    ...
-            // EF.slice(1)
-        };
-        script
+    pub fn new(secret: &str, value: EF) -> Self {
+        let mut bit_commits = Vec::new();
+        for i in 0..EF::D {
+            // let secret_i = format!("{}{}",secret,i);
+            let secret_i = secret;
+            let bit_commit = BitCommit::<F>::new(secret_i, value.as_base_slice()[i]);
+            bit_commits.push(bit_commit)
+        }
+        Self {
+            commit_message: value,
+            bit_commits,
+            _marker: std::marker::PhantomData,
+        }
     }
 
     pub fn message_TOALTSTACK(&self) -> Script {
@@ -94,8 +87,70 @@ impl<F: NativeField, EF: ExtensionField<F>> BitCommitExtension<F, EF> {
             }
         }
     }
+}
 
-    pub fn signature(&self) -> Vec<Vec<u8>> {
+impl<F: BfBaseField, EF: BfExtensionField<F>> BitsCommitment for BitCommitExtension<F, EF> {
+    fn recover_message_at_stack(&self) -> Script {
+        // we must confirm the stack state look like below after the inputs enter to match the complete_script:
+        // bit_commits[0].sig  <- top
+        // bit_commits[1].sig
+        //       ...
+        // bit_commits[N].sig
+        let script = script! {
+            for i in 0..(EF::D-1){
+                {self.bit_commits[i].recover_message_euqal_to_commit_message()}
+                {self.bit_commits[i].origin_value}
+                OP_TOALTSTACK
+            }
+
+            {self.bit_commits[EF::D-1].recover_message_euqal_to_commit_message()}
+            {self.bit_commits[EF::D-1].origin_value}
+
+            for _ in 0..EF::D-1{
+                OP_FROMALTSTACK
+            }
+            // The stake state looks like below:
+            // EF.slice(0)  <- top
+            // EF.slice(1)
+            //    ...
+            // EF.slice(EF::D-1)
+        };
+        script
+    }
+
+    fn recover_message_at_altstack(&self) -> Script {
+        // we must confirm the stack state look like below after the inputs enter to match the recover_message_at_altstack:
+        // bit_commits[0].sig  <- top
+        // bit_commits[1].sig
+        //       ...
+        // bit_commits[N].sig
+        let script = script! {
+            for i in 0..EF::D{
+                {self.bit_commits[i].recover_message_euqal_to_commit_message()}
+                {self.bit_commits[i].origin_value}
+                OP_TOALTSTACK
+            }
+
+            // The altstake state looks like below:
+            // EF.slice(EF::D-1)  <- top
+            // EF.slice(EF::D-2)
+            //    ...
+            // EF.slice(1)
+        };
+        script
+    }
+
+    // signuture is the input of this script
+    fn recover_message_euqal_to_commit_message(&self) -> Script {
+        let ms = self.commit_message.as_base_slice();
+        script! {
+            {self.recover_message_at_stack()}
+            { ms[3].as_u32() } { ms[2].as_u32() } { ms[1].as_u32() } { ms[0].as_u32() }
+            { u31ext_equalverify::<BabyBear4>() }
+        }
+    }
+
+    fn signature(&self) -> Vec<Vec<u8>> {
         let mut sigs = Vec::new();
         for i in (0..EF::D).rev() {
             sigs.append(&mut self.bit_commits[i].signature());
@@ -116,7 +171,7 @@ mod test {
     use super::*;
     use crate::{
         execute_script, execute_script_with_inputs, u31ext_add, u31ext_double, u31ext_equalverify,
-        u31ext_mul, u31ext_sub, BabyBear4,
+        BabyBear4,
     };
 
     type F = BabyBear;
@@ -178,9 +233,7 @@ mod test {
 
         let a: &[F] = a.as_base_slice();
         let script = script! {
-            { a_commit.recover_message_at_stack() }
-            { a[3].as_canonical_u32() } { a[2].as_canonical_u32() } { a[1].as_canonical_u32() } { a[0].as_canonical_u32() }
-            { u31ext_equalverify::<BabyBear4>() }
+            {a_commit.recover_message_euqal_to_commit_message()}
             OP_1
         };
         let a_sigs = a_commit.signature();

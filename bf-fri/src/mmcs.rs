@@ -1,9 +1,10 @@
+use alloc::ffi::NulError;
 use alloc::vec::Vec;
 use core::hash::Hash;
 use core::marker::PhantomData;
 use core::usize;
 
-use bf_scripts::NativeField;
+use bf_scripts::{BfBaseField, BfField};
 use bitcoin::io::Error;
 use bitcoin::taproot::{LeafNode, NodeInfo, TaprootBuilderError, TaprootMerkleBranch};
 use bitcoin::{ScriptBuf, TapNodeHash};
@@ -17,12 +18,22 @@ use crate::prover::{self, BF_MATRIX_WIDTH, DEFAULT_MATRIX_WIDTH};
 use crate::taptree::PolyCommitTree;
 use crate::BfCommitPhaseProofStep;
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
-pub struct PolyCommitTreeMmcs<F: NativeField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize> {
+pub struct PolyCommitTreeMmcs<F: BfBaseField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize> {
     pub(crate) tree: PolyCommitTree<F, NUM_POLY, LOG_POLY_POINTS>,
     pub(crate) _phantom: PhantomData<F>,
 }
 
-impl<F: NativeField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize> Mmcs<F>
+impl<F: BfBaseField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize>
+    PolyCommitTreeMmcs<F, NUM_POLY, LOG_POLY_POINTS>
+{
+    pub fn new() -> Self {
+        Self {
+            tree: PolyCommitTree::new(),
+            _phantom: PhantomData,
+        }
+    }
+}
+impl<F: BfBaseField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize> Mmcs<F>
     for PolyCommitTreeMmcs<F, NUM_POLY, LOG_POLY_POINTS>
 {
     type ProverData = PolyCommitTree<F, NUM_POLY, LOG_POLY_POINTS>;
@@ -91,7 +102,7 @@ impl<F: NativeField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize> Mmcs<F
     }
 }
 
-impl<F: NativeField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize> DirectMmcs<F>
+impl<F: BfBaseField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize> DirectMmcs<F>
     for PolyCommitTreeMmcs<F, NUM_POLY, LOG_POLY_POINTS>
 {
     fn commit(&self, inputs: Vec<RowMajorMatrix<F>>) -> (Self::Commitment, Self::ProverData) {
@@ -106,13 +117,12 @@ impl<F: NativeField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize> Direct
         //     assert_eq!(row.len(),DEFAULT_MATRIX_WIDTH)
         // }
 
-        // todo: support matrix width more than 1
         // we just consider the matrix width is one here which means that the PACK_FIELD is the same as the FIELD
-        inputs
-            .iter()
-            .for_each(|matrix| assert_eq!(matrix.width(), DEFAULT_MATRIX_WIDTH));
+        // inputs
+        //     .iter()
+        //     .for_each(|matrix| assert_eq!(matrix.width(), DEFAULT_MATRIX_WIDTH));
 
-        tree.commit_rev_points(inputs[0].values.clone(), DEFAULT_MATRIX_WIDTH);
+        tree.commit_rev_points(inputs[0].values.clone(), inputs[0].width);
         let root = tree.root().clone();
         (root.node_hash(), tree)
     }

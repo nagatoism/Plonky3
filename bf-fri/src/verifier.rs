@@ -1,7 +1,7 @@
 use alloc::vec;
 use alloc::vec::Vec;
 
-use bf_scripts::{execute_script, execute_script_with_inputs, NativeField};
+use bf_scripts::{execute_script, execute_script_with_inputs, BfField};
 use bitcoin::taproot::TapLeaf;
 use bitcoin::Script;
 use itertools::izip;
@@ -139,14 +139,14 @@ where
         let index_sibling = index ^ 1;
         let index_pair = index >> 1;
 
-        let opening = reduced_openings[log_folded_height+1];
+        let opening = reduced_openings[log_folded_height + 1];
         assert_eq!(opening.leaf_index, index);
         assert_eq!(opening.sibling_leaf_index, index_sibling);
 
         // Todo: get x p(x) -x p(-x) value
         r = x;
         neg_r = x * F::two_adic_generator(1);
-        assert_eq!(y_r,opening.value);
+        assert_eq!(y_r, opening.value);
         // y_r = opening.value;
         y_neg_r = opening.sibling_value;
 

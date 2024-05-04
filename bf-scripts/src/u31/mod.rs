@@ -4,15 +4,13 @@ use bitcoin::opcodes::{OP_ADD, OP_FROMALTSTACK, OP_LSHIFT, OP_SWAP, OP_TOALTSTAC
 use bitcoin::ScriptBuf as Script;
 use bitcoin_script::script;
 
-use crate::fri::NativeField;
+use crate::fri::BfField;
 use crate::{pushable, unroll};
 mod m31;
 pub use m31::*;
 
 mod babybear;
 pub use babybear::BabyBearU31;
-
-use crate::fri::bit_commitment::{LOG_D_usize, D, LOG_D, N0_INS as N0, N1_INS as N1, N_INS as N};
 
 pub trait U31Config {
     const MOD: u32;
@@ -183,7 +181,7 @@ mod test {
     use rand_chacha::ChaCha20Rng;
 
     use super::*;
-    use crate::execute_script;
+    use crate::{execute_script, BfBaseField};
 
     #[test]
     fn test_folding_poly() {

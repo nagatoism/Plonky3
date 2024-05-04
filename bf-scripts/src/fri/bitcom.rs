@@ -1,23 +1,26 @@
 use std::marker::PhantomData;
+use std::ops::Deref;
 
-use bitcoin::opcodes::{OP_EQUAL, OP_EQUALVERIFY};
+use bitcoin::opcodes::{OP_EQUAL, OP_EQUALVERIFY, OP_TOALTSTACK};
 use bitcoin::ScriptBuf as Script;
 use bitcoin_script::{define_pushable, script};
 
 use super::winternitz::*;
-use super::NativeField;
+use super::BfField;
 use crate::u32_std::u32_compress;
+use crate::{BfBaseField, BitsCommitment};
 define_pushable!();
 
-pub struct BitCommit<F: NativeField> {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BitCommit<F: BfBaseField> {
     pub origin_value: u32,
     pub winter: Winternitz<F>,
     pub message: Vec<u8>, // every u8 only available for 4-bits
     _marker: PhantomData<F>,
 }
 
-impl<F: NativeField> BitCommit<F> {
-    pub fn new(secret_key: String, origin_value: F) -> Self {
+impl<F: BfBaseField> BitCommit<F> {
+    pub fn new(secret_key: &str, origin_value: F) -> Self {
         let origin_value = origin_value.as_u32();
         let winter = Winternitz::<F>::new(&secret_key);
         let message = to_digits(origin_value, F::N0);
@@ -65,27 +68,37 @@ impl<F: NativeField> BitCommit<F> {
         }
     }
 
-    pub fn recover_message(&self) -> Script {
+    pub fn signature_script(&self) -> Script {
+        self.winter.sign_script(&self.message)
+    }
+}
+
+impl<F: BfBaseField> BitsCommitment for BitCommit<F> {
+    fn recover_message_at_stack(&self) -> Script {
         script! {
             {self.checksig_verify_script()}
             {u32_compress()}
         }
     }
 
-    // signuture is the input of this script
-    pub fn complete_script(&self) -> Script {
+    fn recover_message_at_altstack(&self) -> Script {
         script! {
-            {self.recover_message()}
+            {self.checksig_verify_script()}
+            {u32_compress()}
+            OP_TOALTSTACK
+        }
+    }
+
+    // signuture is the input of this script
+    fn recover_message_euqal_to_commit_message(&self) -> Script {
+        script! {
+            {self.recover_message_at_stack()}
             {self.origin_value }
             OP_EQUALVERIFY
         }
     }
 
-    pub fn signature_script(&self) -> Script {
-        self.winter.sign_script(&self.message)
-    }
-
-    pub fn signature(&self) -> Vec<Vec<u8>> {
+    fn signature(&self) -> Vec<Vec<u8>> {
         let mut sig = self.winter.sign(&self.message);
         for i in 0..sig.len() {
             if sig[i].len() == 1 && sig[i][0] == 0 {
@@ -95,7 +108,6 @@ impl<F: NativeField> BitCommit<F> {
         sig
     }
 }
-
 #[cfg(test)]
 mod test {
     use p3_baby_bear::BabyBear;
@@ -103,12 +115,11 @@ mod test {
 
     use super::*;
     use crate::execute_script_with_inputs;
-    use crate::u32_std::u32_compress;
 
     #[test]
     fn test_bit_commit_with_compressu32() {
         let value = BabyBear::from_u32(0x11654321);
-        let x_commitment = BitCommit::new("0000".to_string(), value);
+        let x_commitment = BitCommit::new("0000", value);
 
         let signature = x_commitment.signature();
         // let exec_scripts = script! {
@@ -119,7 +130,7 @@ mod test {
         // };
 
         let exec_scripts = script! {
-            { x_commitment.complete_script() }
+            { x_commitment.recover_message_euqal_to_commit_message() }
             OP_1
         };
 
@@ -131,7 +142,7 @@ mod test {
 
     #[test]
     fn test_bit_commmit_sig_and_verify() {
-        let x_commitment = BitCommit::new("0000".to_string(), BabyBear::from_u32(0x11654321));
+        let x_commitment = BitCommit::new("0000", BabyBear::from_u32(0x11654321));
         assert_eq!(
             x_commitment.commit_u32_as_4bytes(),
             [0x11, 0x65, 0x43, 0x21]
@@ -167,7 +178,7 @@ mod test {
             let n = random_number % BabyBear::MOD;
 
             let x_commitment = BitCommit::new(
-                "b138982ce17ac813d505b5b40b665d404e9528e8".to_string(),
+                "b138982ce17ac813d505b5b40b665d404e9528e8",
                 BabyBear::from_u32(n),
             );
             println!("{:?}", x_commitment.commit_u32_as_4bytes());

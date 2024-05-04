@@ -1,18 +1,18 @@
+use bitcoin::psbt::Output;
 pub use p3_baby_bear::BabyBear;
 use p3_field::extension::BinomialExtensionField;
-use p3_field::{AbstractField, PrimeField, PrimeField32, TwoAdicField};
+use p3_field::{
+    AbstractExtensionField, AbstractField, PackedValue, PrimeField, PrimeField32, TwoAdicField,
+};
 use rand::Rng;
-pub trait NativeField:
-    PrimeField + PrimeField32 + AbstractField + TwoAdicField + Clone + Copy
-{
+pub trait BfField: AbstractField + TwoAdicField + Clone + Copy {
+    // type AsU32Output;
     const BIS_SIZE: usize;
     const MOD: u32;
     const N0: usize;
     const N1: usize;
     const N: usize;
-    fn as_u32(&self) -> u32 {
-        self.as_canonical_u32()
-    }
+
     fn from_u32(data: u32) -> Self {
         Self::from_canonical_u32(data)
     }
@@ -39,12 +39,49 @@ pub trait NativeField:
     }
 }
 
-impl NativeField for BabyBear {
+pub trait BfBaseField: BfField + PrimeField32 {
+    fn as_u32(&self) -> u32;
+}
+
+pub trait FieldAsSlice: BfField {
+    fn as_slice(&self) -> &[u32];
+}
+
+pub trait BfExtensionField<Base: BfBaseField>: BfField + AbstractExtensionField<Base> {
+    type BfBase: BfBaseField;
+}
+impl BfField for BabyBear {
     const BIS_SIZE: usize = 32;
     const MOD: u32 = 0x78000001;
     const N: usize = 10;
     const N0: usize = 8;
     const N1: usize = 2;
+}
+
+impl BfBaseField for BabyBear {
+    fn as_u32(&self) -> u32 {
+        self.as_canonical_u32()
+    }
+}
+
+// impl FieldAsSlice for BabyBear {
+//     fn as_slice<'a>(&self) -> &'a [u32]{
+//         let array = [self.as_canonical_u32()];
+//         &array
+//     }
+// }
+// type ExtensionBab = BinomialExtensionField<BabyBear, 4>;
+impl BfField for BinomialExtensionField<BabyBear, 4> {
+    // type AsU32Output = Vec<u32>;
+    const BIS_SIZE: usize = 32;
+    const MOD: u32 = 0x78000001;
+    const N: usize = 10;
+    const N0: usize = 8;
+    const N1: usize = 2;
+}
+
+impl BfExtensionField<BabyBear> for BinomialExtensionField<BabyBear, 4> {
+    type BfBase = BabyBear;
 }
 
 mod tests {

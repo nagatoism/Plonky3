@@ -1,4 +1,4 @@
-use bf_fri::{prover, verifier, FriConfig};
+use bf_fri::{prover, verifier, FriConfig, PolyCommitTreeMmcs};
 use itertools::Itertools;
 use p3_baby_bear::{BabyBear, DiffusionMatrixBabybear};
 use p3_challenger::{CanSampleBits, DuplexChallenger, FieldChallenger};
@@ -22,17 +22,17 @@ type Challenge = BinomialExtensionField<Val, 4>;
 type Perm = Poseidon2<Val, DiffusionMatrixBabybear, 16, 7>;
 type MyHash = PaddingFreeSponge<Perm, 16, 8, 8>;
 type MyCompress = TruncatedPermutation<Perm, 2, 8, 16>;
-type ValMmcs =
-    FieldMerkleTreeMmcs<<Val as Field>::Packing, <Val as Field>::Packing, MyHash, MyCompress, 8>;
+// type ValMmcs =
+//     FieldMerkleTreeMmcs<<Val as Field>::Packing, <Val as Field>::Packing, MyHash, MyCompress, 8>;
+type ValMmcs = PolyCommitTreeMmcs<Val, 1, 8>;
 type ChallengeMmcs = ExtensionMmcs<Val, Challenge, ValMmcs>;
 type Challenger = DuplexChallenger<Val, Perm, 16>;
 type MyFriConfig = FriConfig<ChallengeMmcs>;
 
 fn get_ldt_for_testing<R: Rng>(rng: &mut R) -> (Perm, MyFriConfig) {
     let perm = Perm::new_from_rng(8, 22, DiffusionMatrixBabybear, rng);
-    let hash = MyHash::new(perm.clone());
-    let compress = MyCompress::new(perm.clone());
-    let mmcs = ChallengeMmcs::new(ValMmcs::new(hash, compress));
+
+    let mmcs = ChallengeMmcs::new(ValMmcs::new());
     let fri_config = FriConfig {
         log_blowup: 1,
         num_queries: 10,
@@ -48,9 +48,9 @@ fn do_test_fri_ldt<R: Rng>(rng: &mut R) {
 
     let shift = Val::generator();
 
-    let ldes: Vec<RowMajorMatrix<Val>> = (3..10)
+    let ldes: Vec<RowMajorMatrix<Val>> = (9..10)
         .map(|deg_bits| {
-            let evals = RowMajorMatrix::<Val>::rand_nonzero(rng, 1 << deg_bits, 16);
+            let evals = RowMajorMatrix::<Val>::rand_nonzero(rng, 1 << deg_bits, 1);
             let mut lde = dft.coset_lde_batch(evals, 1, shift);
             reverse_matrix_index_bits(&mut lde);
             lde
