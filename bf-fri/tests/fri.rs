@@ -1,4 +1,4 @@
-use bf_fri::{prover, verifier, FriConfig, PolyCommitTreeMmcs};
+use bf_fri::{prover, verifier, FriConfig, TapTreeMmcs};
 use itertools::Itertools;
 use p3_baby_bear::{BabyBear, DiffusionMatrixBabybear};
 use p3_challenger::{CanSampleBits, DuplexChallenger, FieldChallenger};
@@ -24,7 +24,7 @@ type MyHash = PaddingFreeSponge<Perm, 16, 8, 8>;
 type MyCompress = TruncatedPermutation<Perm, 2, 8, 16>;
 // type ValMmcs =
 //     FieldMerkleTreeMmcs<<Val as Field>::Packing, <Val as Field>::Packing, MyHash, MyCompress, 8>;
-type ValMmcs = PolyCommitTreeMmcs<Val, 1, 8>;
+type ValMmcs = TapTreeMmcs<Val, 1, 8>;
 type ChallengeMmcs = ExtensionMmcs<Val, Challenge, ValMmcs>;
 type Challenger = DuplexChallenger<Val, Perm, 16>;
 type MyFriConfig = FriConfig<ChallengeMmcs>;

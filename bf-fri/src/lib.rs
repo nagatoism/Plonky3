@@ -11,10 +11,12 @@ mod proof;
 pub mod prover;
 // mod two_adic_pcs;
 pub mod error;
+pub mod extension_mmcs;
 pub mod taptree;
 pub mod verifier;
 
 pub use config::*;
+pub use extension_mmcs::*;
 pub use fold_even_odd::*;
 pub use mmcs::*;
 pub use proof::*;

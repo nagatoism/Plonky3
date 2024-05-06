@@ -4,7 +4,7 @@ use core::hash::Hash;
 use core::marker::PhantomData;
 use core::usize;
 
-use bf_scripts::{BfBaseField, BfField};
+use bf_scripts::{BfBaseField, BfExtensionField, BfField};
 use bitcoin::io::Error;
 use bitcoin::taproot::{LeafNode, NodeInfo, TaprootBuilderError, TaprootMerkleBranch};
 use bitcoin::{ScriptBuf, TapNodeHash};
@@ -18,34 +18,34 @@ use crate::prover::{self, BF_MATRIX_WIDTH, DEFAULT_MATRIX_WIDTH};
 use crate::taptree::PolyCommitTree;
 use crate::BfCommitPhaseProofStep;
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
-pub struct PolyCommitTreeMmcs<F: BfBaseField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize> {
-    pub(crate) tree: PolyCommitTree<F, NUM_POLY, LOG_POLY_POINTS>,
-    pub(crate) _phantom: PhantomData<F>,
+pub struct TapTreeMmcs<F: BfBaseField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize> {
+    pub(crate) tree: PolyCommitTree<NUM_POLY, LOG_POLY_POINTS>,
+    _marker: PhantomData<F>,
 }
 
 impl<F: BfBaseField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize>
-    PolyCommitTreeMmcs<F, NUM_POLY, LOG_POLY_POINTS>
+    TapTreeMmcs<F, NUM_POLY, LOG_POLY_POINTS>
 {
     pub fn new() -> Self {
         Self {
             tree: PolyCommitTree::new(),
-            _phantom: PhantomData,
+            _marker: PhantomData,
         }
     }
 }
 impl<F: BfBaseField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize> Mmcs<F>
-    for PolyCommitTreeMmcs<F, NUM_POLY, LOG_POLY_POINTS>
+    for TapTreeMmcs<F, NUM_POLY, LOG_POLY_POINTS>
 {
-    type ProverData = PolyCommitTree<F, NUM_POLY, LOG_POLY_POINTS>;
-    type Commitment = TapNodeHash;
+    type ProverData = PolyCommitTree<NUM_POLY, LOG_POLY_POINTS>;
     type Proof = BfCommitPhaseProofStep;
+    type Commitment = TapNodeHash;
     type Error = BfError;
     type Mat<'a> = RowMajorMatrixView<'a, F>;
 
     fn open_batch(
         &self,
         index: usize,
-        prover_data: &PolyCommitTree<F, NUM_POLY, LOG_POLY_POINTS>,
+        prover_data: &PolyCommitTree<NUM_POLY, LOG_POLY_POINTS>,
     ) -> (Vec<Vec<F>>, Self::Proof) {
         unimplemented!()
     }
@@ -53,7 +53,7 @@ impl<F: BfBaseField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize> Mmcs<F
     fn open_taptree(
         &self,
         index: usize,
-        prover_data: &PolyCommitTree<F, NUM_POLY, LOG_POLY_POINTS>,
+        prover_data: &PolyCommitTree<NUM_POLY, LOG_POLY_POINTS>,
     ) -> Self::Proof {
         let opening_leaf = prover_data.get_leaf(index).unwrap().clone();
         let merkle_branch = opening_leaf.merkle_branch().clone();
@@ -103,24 +103,13 @@ impl<F: BfBaseField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize> Mmcs<F
 }
 
 impl<F: BfBaseField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize> DirectMmcs<F>
-    for PolyCommitTreeMmcs<F, NUM_POLY, LOG_POLY_POINTS>
+    for TapTreeMmcs<F, NUM_POLY, LOG_POLY_POINTS>
 {
     fn commit(&self, inputs: Vec<RowMajorMatrix<F>>) -> (Self::Commitment, Self::ProverData) {
         assert_eq!(inputs.len(), 1);
         assert_eq!(inputs[0].width, DEFAULT_MATRIX_WIDTH);
 
-        let mut tree = PolyCommitTree::<F, NUM_POLY, LOG_POLY_POINTS>::new();
-
-        // let height: usize = inputs[0].height();
-        // for row_index in (0..height){
-        //     let row = inputs[0].row_slice(row_index);
-        //     assert_eq!(row.len(),DEFAULT_MATRIX_WIDTH)
-        // }
-
-        // we just consider the matrix width is one here which means that the PACK_FIELD is the same as the FIELD
-        // inputs
-        //     .iter()
-        //     .for_each(|matrix| assert_eq!(matrix.width(), DEFAULT_MATRIX_WIDTH));
+        let mut tree = PolyCommitTree::<NUM_POLY, LOG_POLY_POINTS>::new();
 
         tree.commit_rev_points(inputs[0].values.clone(), inputs[0].width);
         let root = tree.root().clone();
