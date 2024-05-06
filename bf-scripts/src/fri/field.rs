@@ -45,7 +45,7 @@ pub trait BaseCanCommit {
     fn as_u32(&self) -> u32;
 }
 
-pub trait ExtensionCanCommit<Base:BaseCanCommit> {
+pub trait ExtensionCanCommit<Base: BaseCanCommit> {
     fn as_base_array(&self) -> &[Base];
 
     fn as_u32_array(&self) -> Vec<u32> {
@@ -53,14 +53,15 @@ pub trait ExtensionCanCommit<Base:BaseCanCommit> {
     }
 }
 
-pub trait BfBaseField: BaseCanCommit + BfField + PrimeField32 {
-}
+pub trait BfBaseField: BaseCanCommit + BfField + PrimeField32 {}
 
 pub trait FieldAsSlice: BfField {
     fn as_slice(&self) -> &[u32];
 }
 
-pub trait BfExtensionField<Base: BfBaseField>: ExtensionCanCommit<Base> + AbstractExtensionField<Base> + Hash + Eq + PartialEq{
+pub trait BfExtensionField<Base: BfBaseField>:
+    ExtensionCanCommit<Base> + AbstractExtensionField<Base> + Hash + Eq + PartialEq
+{
     type BfBase: BfBaseField;
 }
 
@@ -78,8 +79,7 @@ impl BaseCanCommit for BabyBear {
     const N1: usize = 2;
 }
 
-impl BfBaseField for BabyBear{}
-
+impl BfBaseField for BabyBear {}
 
 impl BfField for BinomialExtensionField<BabyBear, 4> {
     // type AsU32Output = Vec<u32>;
@@ -87,7 +87,7 @@ impl BfField for BinomialExtensionField<BabyBear, 4> {
     const MOD: u32 = 0x78000001;
 }
 
-impl ExtensionCanCommit<BabyBear> for BinomialExtensionField<BabyBear, 4>{
+impl ExtensionCanCommit<BabyBear> for BinomialExtensionField<BabyBear, 4> {
     fn as_base_array(&self) -> &[BabyBear] {
         self.as_base_slice()
     }

@@ -20,7 +20,7 @@ use std::marker::PhantomData;
 pub use bitcoin_script::{define_pushable, script};
 
 pub use crate::execute_script;
-use crate::BfField;
+use crate::{BaseCanCommit, BfField};
 
 define_pushable!();
 use bitcoin::hashes::{hash160, Hash};
@@ -54,13 +54,13 @@ pub const N_INS: usize = N0_INS + N1_INS;
 // Helper functions
 //
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
-pub struct Winternitz<F: BfField> {
+pub struct Winternitz<F: BaseCanCommit> {
     secret_key: String,
     pub_key: Vec<Vec<u8>>,
     _marker: PhantomData<F>,
 }
 
-impl<F: BfField> Winternitz<F> {
+impl<F: BaseCanCommit> Winternitz<F> {
     pub fn new(secret_key: &str) -> Self {
         let mut pubkey = Vec::new();
         for i in 0..F::N {

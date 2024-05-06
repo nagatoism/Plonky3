@@ -181,6 +181,7 @@ mod test {
     use rand_chacha::ChaCha20Rng;
 
     use super::*;
+    use crate::fri::field::BaseCanCommit;
     use crate::{execute_script, BfBaseField};
 
     #[test]

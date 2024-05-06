@@ -1,18 +1,72 @@
-use std::marker::PhantomData;
-use std::usize;
-
-use bitcoin::hashes::{hash160, Hash};
-use bitcoin::opcodes::{OP_EQUAL, OP_EQUALVERIFY, OP_SWAP};
+use std::{usize};
 use bitcoin::ScriptBuf as Script;
 use bitcoin_script::{define_pushable, script};
 
 use super::bitcom::*;
-use super::winternitz::*;
-use super::BfField;
 use crate::{
-    fold_degree, BabyBearU31, BfBaseField, BfExtensionField, BitCommitExtension, BitsCommitment,
+    BCAssignment,  BfBaseField, BfExtensionField, BitCommitExtension,
+    BitsCommitment, ExtensionBCAssignment,
 };
 define_pushable!();
+
+
+pub struct ExtensionPointsLeaf<F: BfBaseField,EF:BfExtensionField<F>> {
+    leaf_index_1: usize,
+    leaf_index_2: usize,
+    points: ExtensionPoints<F,EF>,
+}
+
+impl<F: BfBaseField,EF:BfExtensionField<F>>  ExtensionPointsLeaf<F,EF> {
+    pub fn new_from_assign(
+        leaf_index_1: usize,
+        leaf_index_2: usize,
+        x: EF,
+        y: EF,
+        x2: EF,
+        y2: EF,
+        bc_assign: &mut ExtensionBCAssignment<F, EF>,
+    ) -> Self {
+        let points = ExtensionPoints::<F,EF>::new_from_assign(x, y, x2, y2,bc_assign);
+        Self {
+            leaf_index_1,
+            leaf_index_2,
+            points,
+        }
+    }
+
+    pub fn new(
+        leaf_index_1: usize,
+        leaf_index_2: usize,
+        x: EF,
+        y: EF,
+        x2: EF,
+        y2: EF,
+    ) -> Self {
+        
+        let points = ExtensionPoints::<F,EF>::new(x, y, x2, y2);
+        Self {
+            leaf_index_1,
+            leaf_index_2,
+            points,
+        }
+    }
+
+    pub fn recover_points_euqal_to_commited_point(&self) -> Script {
+        let scripts = script! {
+            {self.points.p1.recover_point_euqal_to_commited_point()}
+            {self.points.p2.recover_point_euqal_to_commited_point()}
+            OP_1
+        };
+        scripts
+    }
+
+    pub fn signature(&self) -> Vec<Vec<u8>> {
+        let mut p1_sigs = self.points.p1.signature();
+        let mut p2_sigs = self.points.p2.signature();
+        p2_sigs.append(p1_sigs.as_mut());
+        p2_sigs
+    }
+}
 
 pub struct PointsLeaf<F: BfBaseField> {
     leaf_index_1: usize,
@@ -60,6 +114,18 @@ pub struct ExtensionPoints<F: BfBaseField, EF: BfExtensionField<F>> {
 }
 
 impl<F: BfBaseField, EF: BfExtensionField<F>> ExtensionPoints<F, EF> {
+    pub fn new_from_assign(
+        x1: EF,
+        y1: EF,
+        x2: EF,
+        y2: EF,
+        bc_assign: &mut ExtensionBCAssignment<F, EF>,
+    ) -> ExtensionPoints<F, EF> {
+        let p1 = ExtensionPoint::<F, EF>::new_from_assign(x1, y1, bc_assign);
+        let p2 = ExtensionPoint::<F, EF>::new_from_assign(x2, y2, bc_assign);
+        Self { p1, p2 }
+    }
+
     pub fn new(x1: EF, y1: EF, x2: EF, y2: EF) -> ExtensionPoints<F, EF> {
         let p1 = ExtensionPoint::<F, EF>::new(x1, y1);
         let p2 = ExtensionPoint::<F, EF>::new(x2, y2);
@@ -118,11 +184,29 @@ pub struct ExtensionPoint<F: BfBaseField, EF: BfExtensionField<F>> {
 }
 
 impl<F: BfBaseField, EF: BfExtensionField<F>> ExtensionPoint<F, EF> {
+    pub fn new_from_assign(
+        x: EF,
+        y: EF,
+        bc_assign: &mut ExtensionBCAssignment<F, EF>,
+    ) -> ExtensionPoint<F, EF> {
+        let x_commit = bc_assign.assign(x.clone());
+        let x_commit = x_commit.clone();
+        let y_commit = bc_assign.assign(y.clone());
+        let y_commit = y_commit.clone();
+        // let y_commit = bc_assign.assign_extension1::<EF>(y);
+        Self {
+            x: x,
+            y: y,
+            x_commit: x_commit,
+            y_commit: y_commit,
+        }
+    }
+
     pub fn new(x: EF, y: EF) -> ExtensionPoint<F, EF> {
         let x_commit =
-            BitCommitExtension::<F, EF>::new("b138982ce17ac813d505b5b40b665d404e9528e8", x);
+            BitCommitExtension::<F, EF>::new("b138982ce17ac813d505b5b40b665d404e9528e8", x.clone());
         let y_commit =
-            BitCommitExtension::<F, EF>::new("b138982ce17ac813d505b5b40b665d404e9528e8", y);
+            BitCommitExtension::<F, EF>::new("b138982ce17ac813d505b5b40b665d404e9528e8", y.clone());
         Self {
             x: x,
             y: y,
@@ -183,6 +267,16 @@ pub struct Point<F: BfBaseField> {
 }
 
 impl<F: BfBaseField> Point<F> {
+    pub fn new_from_assign(x: F, y: F, bc_assign: &mut BCAssignment<F>) -> Point<F> {
+        let commits = bc_assign.assign_multi(vec![x, y]);
+        Self {
+            x: x,
+            y: y,
+            x_commit: commits[0].clone(),
+            y_commit: commits[1].clone(),
+        }
+    }
+
     pub fn new(x: F, y: F) -> Point<F> {
         let x_commit = BitCommit::<F>::new("b138982ce17ac813d505b5b40b665d404e9528e8", x);
         let y_commit = BitCommit::<F>::new("b138982ce17ac813d505b5b40b665d404e9528e8", y);
@@ -244,7 +338,8 @@ mod test {
     use p3_field::{AbstractExtensionField, AbstractField, PrimeField32};
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
-
+    use crate::fri::field::BfField;
+    use crate::BaseCanCommit;
     use super::*;
     use crate::{execute_script_with_inputs, BitCommitExtension};
 

@@ -144,6 +144,7 @@ mod test {
     use rand::Rng;
 
     use super::*;
+    use crate::fri::field::BaseCanCommit;
     use crate::{execute_script_with_inputs, BfBaseField, BitsCommitment};
 
     #[test]
