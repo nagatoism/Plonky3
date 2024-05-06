@@ -1,3 +1,5 @@
+use std::hash::Hash;
+
 use bitcoin::psbt::Output;
 pub use p3_baby_bear::BabyBear;
 use p3_field::extension::BinomialExtensionField;
@@ -9,9 +11,6 @@ pub trait BfField: AbstractField + TwoAdicField + Clone + Copy {
     // type AsU32Output;
     const BIS_SIZE: usize;
     const MOD: u32;
-    const N0: usize;
-    const N1: usize;
-    const N: usize;
 
     fn from_u32(data: u32) -> Self {
         Self::from_canonical_u32(data)
@@ -39,45 +38,59 @@ pub trait BfField: AbstractField + TwoAdicField + Clone + Copy {
     }
 }
 
-pub trait BfBaseField: BfField + PrimeField32 {
+pub trait BaseCanCommit {
+    const N0: usize;
+    const N1: usize;
+    const N: usize;
     fn as_u32(&self) -> u32;
+}
+
+pub trait ExtensionCanCommit<Base:BaseCanCommit> {
+    fn as_base_array(&self) -> &[Base];
+
+    fn as_u32_array(&self) -> Vec<u32> {
+        self.as_base_array().iter().map(|v| v.as_u32()).collect()
+    }
+}
+
+pub trait BfBaseField: BaseCanCommit + BfField + PrimeField32 {
 }
 
 pub trait FieldAsSlice: BfField {
     fn as_slice(&self) -> &[u32];
 }
 
-pub trait BfExtensionField<Base: BfBaseField>: BfField + AbstractExtensionField<Base> {
+pub trait BfExtensionField<Base: BfBaseField>: ExtensionCanCommit<Base> + AbstractExtensionField<Base> + Hash + Eq + PartialEq{
     type BfBase: BfBaseField;
 }
+
 impl BfField for BabyBear {
     const BIS_SIZE: usize = 32;
     const MOD: u32 = 0x78000001;
+}
+
+impl BaseCanCommit for BabyBear {
+    fn as_u32(&self) -> u32 {
+        self.as_canonical_u32()
+    }
     const N: usize = 10;
     const N0: usize = 8;
     const N1: usize = 2;
 }
 
-impl BfBaseField for BabyBear {
-    fn as_u32(&self) -> u32 {
-        self.as_canonical_u32()
-    }
-}
+impl BfBaseField for BabyBear{}
 
-// impl FieldAsSlice for BabyBear {
-//     fn as_slice<'a>(&self) -> &'a [u32]{
-//         let array = [self.as_canonical_u32()];
-//         &array
-//     }
-// }
-// type ExtensionBab = BinomialExtensionField<BabyBear, 4>;
+
 impl BfField for BinomialExtensionField<BabyBear, 4> {
     // type AsU32Output = Vec<u32>;
     const BIS_SIZE: usize = 32;
     const MOD: u32 = 0x78000001;
-    const N: usize = 10;
-    const N0: usize = 8;
-    const N1: usize = 2;
+}
+
+impl ExtensionCanCommit<BabyBear> for BinomialExtensionField<BabyBear, 4>{
+    fn as_base_array(&self) -> &[BabyBear] {
+        self.as_base_slice()
+    }
 }
 
 impl BfExtensionField<BabyBear> for BinomialExtensionField<BabyBear, 4> {
