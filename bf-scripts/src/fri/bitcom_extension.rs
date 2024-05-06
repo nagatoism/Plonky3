@@ -32,6 +32,7 @@ pub trait BitsCommitment {
     fn signature(&self) -> Vec<Vec<u8>>;
 }
 
+#[derive(Clone, Debug, Default,PartialEq,Eq)]
 pub struct BitCommitExtension<F: BfBaseField, EF: BfExtensionField<F>> {
     pub commit_message: EF,
     pub bit_commits: Vec<BitCommit<F>>,
