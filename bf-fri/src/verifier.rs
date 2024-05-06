@@ -156,7 +156,7 @@ where
         let mut xs = vec![r; 2];
         xs[index_sibling % 2] = neg_r;
 
-        if let TapLeaf::Script(script, ver) = step.leaf_node.clone() {
+        if let TapLeaf::Script(script, _ver) = step.leaf_node.clone() {
             // Todo: Execute the script with input
             let res = execute_script(script);
             assert_eq!(res.success, true);

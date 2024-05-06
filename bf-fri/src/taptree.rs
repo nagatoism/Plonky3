@@ -14,8 +14,6 @@ use p3_util::{log2_strict_usize, reverse_slice_index_bits};
 
 use super::error::BfError;
 
-const NUM_POLY: usize = 1;
-
 pub fn combine_two_nodes(a: NodeInfo, b: NodeInfo) -> Result<NodeInfo, BfError> {
     let parent = NodeInfo::combine(a, b)?;
     Ok(parent)
