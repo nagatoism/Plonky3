@@ -4,7 +4,8 @@ use bitcoin::psbt::Output;
 pub use p3_baby_bear::BabyBear;
 use p3_field::extension::BinomialExtensionField;
 use p3_field::{
-    AbstractExtensionField, AbstractField, PackedValue, PrimeField, PrimeField32, TwoAdicField,
+    AbstractExtensionField, AbstractField, ExtensionField, PackedValue, PrimeField, PrimeField32,
+    TwoAdicField,
 };
 use rand::Rng;
 pub trait BfField: AbstractField + TwoAdicField + Clone + Copy {
@@ -60,7 +61,13 @@ pub trait FieldAsSlice: BfField {
 }
 
 pub trait BfExtensionField<Base: BfBaseField>:
-    ExtensionCanCommit<Base> + AbstractExtensionField<Base> + Hash + Eq + PartialEq
+    ExtensionCanCommit<Base>
+    + AbstractExtensionField<Base>
+    + ExtensionField<Base>
+    + BfField
+    + Hash
+    + Eq
+    + PartialEq
 {
     type BfBase: BfBaseField;
 }

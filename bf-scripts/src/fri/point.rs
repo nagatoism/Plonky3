@@ -1,22 +1,22 @@
-use std::{usize};
+use std::usize;
+
 use bitcoin::ScriptBuf as Script;
 use bitcoin_script::{define_pushable, script};
 
 use super::bitcom::*;
 use crate::{
-    BCAssignment,  BfBaseField, BfExtensionField, BitCommitExtension,
-    BitsCommitment, ExtensionBCAssignment,
+    BCAssignment, BfBaseField, BfExtensionField, BitCommitExtension, BitsCommitment,
+    ExtensionBCAssignment,
 };
 define_pushable!();
 
-
-pub struct ExtensionPointsLeaf<F: BfBaseField,EF:BfExtensionField<F>> {
+pub struct ExtensionPointsLeaf<F: BfBaseField, EF: BfExtensionField<F>> {
     leaf_index_1: usize,
     leaf_index_2: usize,
-    points: ExtensionPoints<F,EF>,
+    points: ExtensionPoints<F, EF>,
 }
 
-impl<F: BfBaseField,EF:BfExtensionField<F>>  ExtensionPointsLeaf<F,EF> {
+impl<F: BfBaseField, EF: BfExtensionField<F>> ExtensionPointsLeaf<F, EF> {
     pub fn new_from_assign(
         leaf_index_1: usize,
         leaf_index_2: usize,
@@ -26,7 +26,7 @@ impl<F: BfBaseField,EF:BfExtensionField<F>>  ExtensionPointsLeaf<F,EF> {
         y2: EF,
         bc_assign: &mut ExtensionBCAssignment<F, EF>,
     ) -> Self {
-        let points = ExtensionPoints::<F,EF>::new_from_assign(x, y, x2, y2,bc_assign);
+        let points = ExtensionPoints::<F, EF>::new_from_assign(x, y, x2, y2, bc_assign);
         Self {
             leaf_index_1,
             leaf_index_2,
@@ -34,16 +34,8 @@ impl<F: BfBaseField,EF:BfExtensionField<F>>  ExtensionPointsLeaf<F,EF> {
         }
     }
 
-    pub fn new(
-        leaf_index_1: usize,
-        leaf_index_2: usize,
-        x: EF,
-        y: EF,
-        x2: EF,
-        y2: EF,
-    ) -> Self {
-        
-        let points = ExtensionPoints::<F,EF>::new(x, y, x2, y2);
+    pub fn new(leaf_index_1: usize, leaf_index_2: usize, x: EF, y: EF, x2: EF, y2: EF) -> Self {
+        let points = ExtensionPoints::<F, EF>::new(x, y, x2, y2);
         Self {
             leaf_index_1,
             leaf_index_2,
@@ -338,10 +330,10 @@ mod test {
     use p3_field::{AbstractExtensionField, AbstractField, PrimeField32};
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
-    use crate::fri::field::BfField;
-    use crate::BaseCanCommit;
+
     use super::*;
-    use crate::{execute_script_with_inputs, BitCommitExtension};
+    use crate::fri::field::BfField;
+    use crate::{execute_script_with_inputs, BaseCanCommit, BitCommitExtension};
 
     type F = BabyBear;
     type EF = p3_field::extension::BinomialExtensionField<BabyBear, 4>;

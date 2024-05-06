@@ -1,15 +1,6 @@
 use std::collections::HashMap;
-use std::marker::PhantomData;
-use std::sync::Mutex;
-use std::{array, mem};
 
-use once_cell::sync::Lazy;
-use p3_baby_bear::BabyBear;
-use p3_field::ExtensionField;
-
-use crate::{
-    BaseCanCommit, BfBaseField, BfExtensionField, BitCommit, BitCommitExtension, BitsCommitment,
-};
+use crate::{BfBaseField, BfExtensionField, BitCommit, BitCommitExtension};
 // static BC_ASSIGN: Lazy<Mutex<BCAssignment<BabyBear>>> = Lazy::new(|| {
 //     Mutex::new(BCAssignment::<BabyBear>::new())
 // });
@@ -49,11 +40,6 @@ impl<F: BfBaseField, EF: BfExtensionField<F>> ExtensionBCAssignment<F, EF> {
     pub fn get(&self, value: &EF) -> Option<&BitCommitExtension<F, EF>> {
         let b = self.ebcs.get(value);
         b
-    }
-
-    pub fn get_extension(&self, value: EF) -> BitCommitExtension<F, EF> {
-        let commits = self.bc_assign.get_extension(value.clone());
-        commits
     }
 
     pub fn assign_multi<I: Clone>(&mut self, items: I) -> Vec<&BitCommitExtension<F, EF>>
