@@ -10,7 +10,7 @@ use p3_field::{
 use rand::Rng;
 
 
-pub trait BfField: AbstractField + TwoAdicField + Clone + Copy {
+pub trait BfField: AbstractField + TwoAdicField + Clone + Copy +{
     // type AsU32Output;
     const BIS_SIZE: usize;
     const MOD: u32;
@@ -41,7 +41,7 @@ pub trait BfField: AbstractField + TwoAdicField + Clone + Copy {
         Self::from_wrapped_u32(Self::MOD)
     }
 
-    fn as_u32_array(&self)->[u32;Self::U32_SIZE];
+    fn as_u32_vec(&self)->Vec<u32>;
 }
 
 
@@ -57,8 +57,8 @@ impl BfField for BabyBear {
     const MOD: u32 = 0x78000001;
     const U32_SIZE:usize = 1;
     
-    fn as_u32_array(&self)->[u32;Self::U32_SIZE] {
-        [self.as_canonical_u32()]
+    fn as_u32_vec(&self)->Vec<u32> {
+        vec![self.as_canonical_u32()]
     }
 }
 
@@ -70,8 +70,8 @@ impl BfField for BinomialExtensionField<BabyBear, 4> {
     const MOD: u32 = 0x78000001;
     const U32_SIZE:usize = 4;
     
-    fn as_u32_array(&self)->[u32;Self::U32_SIZE] {
-        self.as_base_slice()
+    fn as_u32_vec(&self)->Vec<u32> {
+        self.as_base_slice().iter().map(|babybear:&BabyBear| babybear.as_canonical_u32()).collect()
     }
 }
 

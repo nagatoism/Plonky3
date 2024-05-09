@@ -13,27 +13,28 @@ use bitcoin::opcodes::{OP_EQUAL, OP_EQUALVERIFY, OP_SWAP};
 use bitcoin::ScriptBuf as Script;
 use bitcoin_script::{define_pushable, script};
 
-use super::bitcom::*;
+
 use super::winternitz::*;
 use super::BfField;
-use crate::{fold_degree, BabyBearU31, BfBaseField, BitsCommitment};
+use crate::{fold_degree, BabyBearU31};
+use super::bit_comm::*;
 define_pushable!();
 
-pub struct VerifyFoldingLeaf<'a, const NUM_POLY: usize, F: BfBaseField> {
+pub struct VerifyFoldingLeaf<'a, const NUM_POLY: usize, F: BfField> {
     x: F,
-    beta: &'a BitCommit<F>,
-    y_0_x_commitment: &'a BitCommit<F>,
-    y_0_neg_x_commitment: &'a BitCommit<F>,
-    y_1_x_square_commitment: &'a BitCommit<F>,
+    beta: &'a BitCommitment<F>,
+    y_0_x_commitment: &'a BitCommitment<F>,
+    y_0_neg_x_commitment: &'a BitCommitment<F>,
+    y_1_x_square_commitment: &'a BitCommitment<F>,
 }
 
-impl<'a, const NUM_POLY: usize, F: BfBaseField> VerifyFoldingLeaf<'a, NUM_POLY, F> {
+impl<'a, const NUM_POLY: usize, F: BfField> VerifyFoldingLeaf<'a, NUM_POLY, F> {
     fn new(
         x: F,
-        beta: &'a BitCommit<F>,
-        y_0_x_commitment: &'a BitCommit<F>,
-        y_0_neg_x_commitment: &'a BitCommit<F>,
-        y_1_x_square_commitment: &'a BitCommit<F>,
+        beta: &'a BitCommitment<F>,
+        y_0_x_commitment: &'a BitCommitment<F>,
+        y_0_neg_x_commitment: &'a BitCommitment<F>,
+        y_1_x_square_commitment: &'a BitCommitment<F>,
     ) -> Self {
         VerifyFoldingLeaf {
             x,
@@ -64,27 +65,27 @@ impl<'a, const NUM_POLY: usize, F: BfBaseField> VerifyFoldingLeaf<'a, NUM_POLY, 
     }
 }
 
-pub struct EvaluationLeaf<const NUM_POLY: usize, F: BfBaseField> {
+pub struct EvaluationLeaf<const NUM_POLY: usize, F: BfField> {
     leaf_index: usize,
     x: F,
-    x_commitment: BitCommit<F>,
-    neg_x_commitment: BitCommit<F>,
+    x_commitment: BitCommitment<F>,
+    neg_x_commitment: BitCommitment<F>,
     evaluations: Vec<F>,
-    evaluations_commitments: Vec<BitCommit<F>>,
+    evaluations_commitments: Vec<BitCommitment<F>>,
 }
 
-impl<const NUM_POLY: usize, F: BfBaseField> EvaluationLeaf<NUM_POLY, F> {
+impl<const NUM_POLY: usize, F: BfField> EvaluationLeaf<NUM_POLY, F> {
     pub fn new(leaf_index: usize, x: F, evaluations: Vec<F>) -> Self {
         assert_eq!(evaluations.len(), NUM_POLY);
 
-        let x_commitment = BitCommit::new("b138982ce17ac813d505b5b40b665d404e9528e8", x);
-        let neg_x_commitment = BitCommit::new(
+        let x_commitment = BitCommitment::new("b138982ce17ac813d505b5b40b665d404e9528e8", x);
+        let neg_x_commitment = BitCommitment::new(
             "b138982ce17ac813d505b5b40b665d404e9528e8",
             F::field_mod() - x,
         );
         let mut evaluations_commitments = Vec::new();
         for i in 0..NUM_POLY {
-            evaluations_commitments.push(BitCommit::new(
+            evaluations_commitments.push(BitCommitment::new(
                 "b138982ce17ac813d505b5b40b665d404e9528e9",
                 evaluations[i],
             ));
@@ -144,8 +145,9 @@ mod test {
     use rand::Rng;
 
     use super::*;
-    use crate::fri::field::BaseCanCommit;
-    use crate::{execute_script_with_inputs, BfBaseField, BitsCommitment};
+
+    use crate::{execute_script_with_inputs, BfField};
+    use crate::bit_comm::BitCommitment;
 
     #[test]
     fn test_leaf_execution() {

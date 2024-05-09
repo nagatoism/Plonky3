@@ -42,7 +42,7 @@ use hex::decode as hex_decode;
 pub const LOG_D: u32 = 4;
 pub const LOG_D_usize: usize = 4;
 /// Digits are base d+1
-pub const D: u32 = (1 << LOG_D) - 1;
+pub const DIGITS: u32 = (1 << LOG_D) - 1;
 /// Number of digits of the message (8x15=120 checksum need 7bits(2 digits))
 pub const N0_INS: usize = 8;
 /// Number of digits of the checksum
@@ -137,7 +137,7 @@ impl<F: BfField> Winternitz<F> {
         for digit in digits {
             sum += *digit as u32;
         }
-        D * F::N0 as u32 - sum
+        DIGITS * F::N0 as u32 - sum
     }
 
     /// Compute the signature for a given message
@@ -196,7 +196,7 @@ impl<F: BfField> Winternitz<F> {
             for digit_index in 0..F::N {
                 // Verify that the digit is in the range [0, d]
                 // See https://github.com/BitVM/BitVM/issues/35
-                { D }
+                { DIGITS }
                 OP_MIN // Return the smaller number
 
                 // Push two copies of the digit onto the altstack
@@ -205,7 +205,7 @@ impl<F: BfField> Winternitz<F> {
                 OP_TOALTSTACK
 
                 // Hash the input hash d times and put every result on the stack
-                for _ in 0..D {
+                for _ in 0..DIGITS {
                     OP_DUP OP_HASH160
                 }
 
@@ -216,7 +216,7 @@ impl<F: BfField> Winternitz<F> {
                 OP_EQUALVERIFY
 
                 // Drop the d+1 stack items
-                for _ in 0..(D+1)/2 {
+                for _ in 0..(DIGITS+1)/2 {
                     OP_2DROP
                 }
             }
@@ -231,7 +231,7 @@ impl<F: BfField> Winternitz<F> {
             for _ in 1..F::N0 {
                 OP_FROMALTSTACK OP_TUCK OP_SUB
             }
-            { D * F::N0 as u32 }
+            { DIGITS * F::N0 as u32 }
             OP_ADD
 
 
@@ -281,7 +281,7 @@ pub fn generate_public_key(secret_key: &str, digit_index: u32) -> Vec<u8> {
 
     let mut hash = hash160::Hash::hash(&secret_i);
 
-    for _ in 0..D {
+    for _ in 0..DIGITS {
         hash = hash160::Hash::hash(&hash[..]);
     }
 
@@ -289,11 +289,11 @@ pub fn generate_public_key(secret_key: &str, digit_index: u32) -> Vec<u8> {
 }
 
 /// Convert a number to digits
-pub fn to_digits(mut number: u32, digit_count: usize) -> Vec<u8> {
+pub fn to_digits(mut number: Vec<u32>, digit_count: usize) -> Vec<u8> {
     let mut digits = vec![0u8; digit_count];
     for i in 0..digit_count {
-        let digit = number % (D + 1);
-        number = (number - digit) / (D + 1);
+        let digit = number % (DIGITS + 1);
+        number = (number - digit) / (DIGITS + 1);
         digits[i] = digit as u8;
     }
     digits

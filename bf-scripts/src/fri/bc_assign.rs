@@ -3,85 +3,16 @@ use std::collections::HashMap;
 use p3_baby_bear::BabyBear;
 use p3_field::extension::BinomialExtensionField;
 
-use crate::{BfField, BitCommit, BitCommitExtension};
+use crate::{bit_comm::BitCommitment, BfField};
 // static BC_ASSIGN: Lazy<Mutex<BCAssignment<BabyBear>>> = Lazy::new(|| {
 //     Mutex::new(BCAssignment::<BabyBear>::new())
 // });
-type ExtendedBabyBear =BinomialExtensionField<BabyBear,4>;
-pub enum FRIFields{
-    BabyBear(BabyBear),
-    ExtendedBabyBear(ExtendedBabyBear)
-}
-#[derive(Debug, Clone, Default)]
-pub struct ExtensionBCAssignment {
-    pub ebb_bcs: HashMap<ExtendedBabyBear, BitCommitExtension<ExtendedBabyBear>>,
-    pub bb_bcs:  HashMap<BabyBear, BitCommitExtension<BabyBear>>,
-}
 
-impl ExtensionBCAssignment {
-    pub fn new() -> Self {
-        Self {
-            ebb_bcs:HashMap::new(),
-            bb_bcs:HashMap::new(),
-        }
-    }
 
-    pub fn assign(&mut self, value: EF) -> &BitCommitExtension<F, EF> {
-        self.ebcs.entry(value.clone()).or_insert_with(|| {
-            // self.ebcs.insert(k, v);
-            self.bc_assign.insert_extension(value.clone());
-            let bc: BitCommitExtension<F, EF> = self.bc_assign.get_extension(value.clone());
-            bc
-        })
-    }
-
-    pub fn insert(&mut self, value: EF) {
-        self.ebcs.entry(value.clone()).or_insert_with(|| {
-            // self.ebcs.insert(k, v);
-            self.bc_assign.insert_extension(value.clone());
-            let bc: BitCommitExtension<F, EF> = self.bc_assign.get_extension(value.clone());
-            bc
-        });
-    }
-
-    pub fn get(&self, value: &EF) -> Option<&BitCommitExtension<F, EF>> {
-        let b = self.ebcs.get(value);
-        b
-    }
-
-    pub fn assign_multi<I: Clone>(&mut self, items: I) -> Vec<&BitCommitExtension<F, EF>>
-    where
-        I: IntoIterator<Item = EF>,
-    {
-        self.insert_multi(items.clone());
-        self.get_multi(items)
-    }
-
-    pub fn insert_multi<I>(&mut self, items: I)
-    where
-        I: IntoIterator<Item = EF>,
-    {
-        for key in items {
-            self.insert(key);
-        }
-    }
-
-    pub fn get_multi<I>(&self, items: I) -> Vec<&BitCommitExtension<F, EF>>
-    where
-        I: IntoIterator<Item = EF>,
-    {
-        let mut bit_commits = Vec::new();
-        for key in items {
-            let bc: &BitCommitExtension<F, EF> = self.get(&key).unwrap();
-            bit_commits.push(bc);
-        }
-        bit_commits
-    }
-}
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct BCAssignment<F: BfBaseField> {
-    pub bcs: HashMap<F, BitCommit<F>>,
+pub struct BCAssignment<F: BfField> {
+    pub bcs: HashMap<Vec<u32>, BitCommitment<F>>,
     secret_assign: SecretAssignment,
 }
 
@@ -97,7 +28,7 @@ impl SecretAssignment {
     }
 }
 
-impl<F: BfBaseField> BCAssignment<F> {
+impl<F: BfField> BCAssignment<F> {
     pub fn new() -> Self {
         Self {
             bcs: HashMap::new(),
@@ -110,28 +41,29 @@ impl<F: BfBaseField> BCAssignment<F> {
         self.secret_assign.get_secret()
     }
 
-    pub fn force_insert(&mut self, value: F) -> &BitCommit<F> {
-        let bc = BitCommit::<F>::new(self.get_secret(), value);
+    pub fn force_insert(&mut self, value: F,) -> &BitCommitment<F> {
+        let u32_rep = value.as_u32_array().to_vec();
+        let bc = BitCommitment::<F>::new(self.get_secret(), value);
         self.bcs.insert(value, bc);
         self.get(value).unwrap()
     }
 
-    pub fn get(&self, value: F) -> Option<&BitCommit<F>> {
+    pub fn get(&self, value: F) -> Option<&BitCommitment<F>> {
         self.bcs.get(&value)
     }
 
-    pub fn get_mut(&mut self, value: F) -> Option<&mut BitCommit<F>> {
+    pub fn get_mut(&mut self, value: F) -> Option<&mut BitCommitment<F>> {
         self.bcs.get_mut(&value)
     }
 
-    pub fn assign(&mut self, value: F) -> &BitCommit<F> {
+    pub fn assign(&mut self, value: F) -> &BitCommitment<F> {
         let secret = self.secret_assign.get_secret();
         self.bcs
             .entry(value)
-            .or_insert_with(|| BitCommit::<F>::new(secret, value))
+            .or_insert_with(|| BitCommitment::<F>::new(secret, value))
     }
 
-    pub fn assign_multi<I: Clone>(&mut self, items: I) -> Vec<&BitCommit<F>>
+    pub fn assign_multi<I: Clone>(&mut self, items: I) -> Vec<&BitCommitment<F>>
     where
         I: IntoIterator<Item = F>,
     {
@@ -147,45 +79,24 @@ impl<F: BfBaseField> BCAssignment<F> {
             let secret = self.secret_assign.get_secret();
             self.bcs
                 .entry(key)
-                .or_insert_with(|| BitCommit::<F>::new(secret, key));
+                .or_insert_with(|| BitCommitment::<F>::new(secret, key));
         }
     }
 
-    pub fn get_multi<'a, I>(&'a self, items: I) -> Vec<&'a BitCommit<F>>
+    pub fn get_multi<'a, I>(&'a self, items: I) -> Vec<&'a BitCommitment<F>>
     where
         I: IntoIterator<Item = F>,
     {
         let mut bit_commits = Vec::new();
         for key in items {
-            let bc: &'a BitCommit<F> = self.bcs.get(&key).unwrap();
+            let bc: &'a BitCommitment<F> = self.bcs.get(&key).unwrap();
             bit_commits.push(bc);
         }
         bit_commits
     }
 }
 
-impl<F: BfBaseField> BCAssignment<F> {
-    pub fn insert_extension<EF: BfExtensionField<F>>(&mut self, value: EF) {
-        self.insert_multi(value.as_base_slice().iter().cloned());
-    }
 
-    pub fn get_extension<EF: BfExtensionField<F>>(&self, value: EF) -> BitCommitExtension<F, EF> {
-        let fs = value.as_base_slice();
-        let commits = self.get_multi(fs.iter().cloned());
-        BitCommitExtension::new_from_bit_commits(value, commits)
-    }
-
-    pub fn assign_extension<EF: BfExtensionField<F>>(
-        &mut self,
-        value: EF,
-    ) -> BitCommitExtension<F, EF> {
-        let fs = value.as_base_slice();
-        BitCommitExtension::new_from_bit_commits(
-            value.clone(),
-            self.assign_multi(fs.iter().cloned()),
-        )
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -203,16 +114,16 @@ mod tests {
         let key_origin = 123;
         let key = F::from_canonical_u32(key_origin);
         let bc_assign: &mut BCAssignment<F> = &mut BCAssignment::new();
-        let mut bc_temp: BitCommit<F> = BitCommit::new("1223", key);
+        let mut bc_temp: BitCommitment<F> = BitCommitment::new("1223", key);
         {
             bc_assign.force_insert(key);
-            let bc: &BitCommit<F> = bc_assign.get(key).unwrap();
+            let bc: &BitCommitment<F> = bc_assign.get(key).unwrap();
             assert_eq!(bc.origin_value, key_origin);
             bc_temp = bc.clone();
         }
 
         {
-            let bc1: &BitCommit<F> = bc_assign.assign(key);
+            let bc1: &BitCommitment<F> = bc_assign.assign(key);
             assert_eq!(bc1, &bc_temp);
         }
     }
