@@ -20,10 +20,6 @@ define_pushable!();
 //     BitCommit::<F>::new(secret, value)
 // }
 
-pub enum BitsCommitmentEnum<F: BfBaseField, EF: BfExtensionField<F>> {
-    Base(BitCommit<F>),
-    Extension(BitCommitExtension<F, EF>),
-}
 
 pub trait BitsCommitment {
     fn recover_message_at_stack(&self) -> Script;
@@ -33,30 +29,14 @@ pub trait BitsCommitment {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct BitCommitExtension<F: BfBaseField, EF: BfExtensionField<F>> {
+pub struct BitCommitExtension<F: BfField> {
     pub commit_message: EF,
     pub bit_commits: Vec<BitCommit<F>>,
     _marker: std::marker::PhantomData<EF>,
 }
 
 impl<F: BfBaseField, EF: BfExtensionField<F>> BitCommitExtension<F, EF> {
-    pub fn new_from_bit_commits(value: EF, bcs: Vec<&BitCommit<F>>) -> BitCommitExtension<F, EF> {
-        let mut bit_commits = Vec::new();
-        for i in 0..EF::D {
-            let bit_commit: BitCommit<F> = bcs[i].clone();
-            bit_commits.push(bit_commit);
-        }
-        Self {
-            commit_message: value,
-            bit_commits,
-            _marker: std::marker::PhantomData,
-        }
-    }
-
-    pub fn new_from_base_slice(secret: &str, bs: &[F]) -> Self {
-        let value = EF::from_base_slice(bs);
-        Self::new(secret, value)
-    }
+   
 
     pub fn new(secret: &str, value: EF) -> Self {
         let mut bit_commits = Vec::new();

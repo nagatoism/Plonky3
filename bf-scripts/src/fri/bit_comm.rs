@@ -13,20 +13,20 @@ define_pushable!();
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BitCommit<F: BfBaseField> {
-    pub value: u32,
-    pub winternitz: Winternitz<F>,
+    pub origin_value: u32,
+    pub winternitz: Vec<Winternitz<F>>,
     pub message: Vec<u8>, // every u8 only available for 4-bits
     _marker: PhantomData<F>,
 }
 
 
 impl<F: BfBaseField> BitCommit<F> {
-    pub fn new(secret_key: &str, value: F) -> Self {
-        let value = value.as_u32();
+    pub fn new(secret_key: &str, origin_value: F) -> Self {
+        let origin_value = origin_value.as_u32();
         let winternitz = Winternitz::<F>::new(&secret_key);
-        let message = to_digits(value, F::N0);
+        let message = to_digits(origin_value, F::N0);
         Self {
-            value,
+            origin_value,
             winternitz,
             message,
             _marker: PhantomData,

@@ -5,7 +5,7 @@ use bitcoin_script::{define_pushable, script};
 
 use super::bitcom::*;
 use crate::{
-    BCAssignment, BfBaseField, BfExtensionField, BitCommitExtension, BitsCommitment,
+    BCAssignment, BfField, BitCommitExtension, BitsCommitment,
     ExtensionBCAssignment,
 };
 define_pushable!();
@@ -60,13 +60,13 @@ impl<F: BfBaseField, EF: BfExtensionField<F>> ExtensionPointsLeaf<F, EF> {
     }
 }
 
-pub struct PointsLeaf<F: BfBaseField> {
+pub struct PointsLeaf<F: BfField> {
     leaf_index_1: usize,
     leaf_index_2: usize,
     points: Points<F>,
 }
 
-impl<F: BfBaseField> PointsLeaf<F> {
+impl<F: BfField> PointsLeaf<F> {
     pub fn new(
         leaf_index_1: usize,
         leaf_index_2: usize,
@@ -105,41 +105,6 @@ pub struct ExtensionPoints<F: BfBaseField, EF: BfExtensionField<F>> {
     p2: ExtensionPoint<F, EF>,
 }
 
-impl<F: BfBaseField, EF: BfExtensionField<F>> ExtensionPoints<F, EF> {
-    pub fn new_from_assign(
-        x1: EF,
-        y1: EF,
-        x2: EF,
-        y2: EF,
-        bc_assign: &mut ExtensionBCAssignment<F, EF>,
-    ) -> ExtensionPoints<F, EF> {
-        let p1 = ExtensionPoint::<F, EF>::new_from_assign(x1, y1, bc_assign);
-        let p2 = ExtensionPoint::<F, EF>::new_from_assign(x2, y2, bc_assign);
-        Self { p1, p2 }
-    }
-
-    pub fn new(x1: EF, y1: EF, x2: EF, y2: EF) -> ExtensionPoints<F, EF> {
-        let p1 = ExtensionPoint::<F, EF>::new(x1, y1);
-        let p2 = ExtensionPoint::<F, EF>::new(x2, y2);
-        Self { p1, p2 }
-    }
-
-    pub fn recover_points_euqal_to_commited_points(&self) -> Script {
-        let scripts = script! {
-            {self.p1.recover_point_euqal_to_commited_point()}
-            {self.p2.recover_point_euqal_to_commited_point()}
-        };
-        scripts
-    }
-
-    pub fn signature(&self) -> Vec<Vec<u8>> {
-        let mut p1_sigs = self.p1.signature();
-        let mut p2_sigs = self.p2.signature();
-        p2_sigs.append(p1_sigs.as_mut());
-        p2_sigs
-    }
-}
-
 pub struct Points<F: BfBaseField> {
     p1: Point<F>,
     p2: Point<F>,
@@ -168,12 +133,7 @@ impl<F: BfBaseField> Points<F> {
     }
 }
 
-pub struct ExtensionPoint<F: BfBaseField, EF: BfExtensionField<F>> {
-    x: EF,
-    y: EF,
-    x_commit: BitCommitExtension<F, EF>,
-    y_commit: BitCommitExtension<F, EF>,
-}
+
 
 impl<F: BfBaseField, EF: BfExtensionField<F>> ExtensionPoint<F, EF> {
     pub fn new_from_assign(

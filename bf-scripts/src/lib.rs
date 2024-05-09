@@ -1,4 +1,4 @@
-// #![feature(generic_const_exprs)]
+#![feature(generic_const_exprs)]
 use bitcoin::blockdata::transaction;
 use bitcoin::blockdata::transaction::Transaction;
 use bitcoin::hashes::Hash;

@@ -1,21 +1,28 @@
 use std::collections::HashMap;
 
-use crate::{BfBaseField, BfExtensionField, BitCommit, BitCommitExtension};
+use p3_baby_bear::BabyBear;
+use p3_field::extension::BinomialExtensionField;
+
+use crate::{BfField, BitCommit, BitCommitExtension};
 // static BC_ASSIGN: Lazy<Mutex<BCAssignment<BabyBear>>> = Lazy::new(|| {
 //     Mutex::new(BCAssignment::<BabyBear>::new())
 // });
-
+type ExtendedBabyBear =BinomialExtensionField<BabyBear,4>;
+pub enum FRIFields{
+    BabyBear(BabyBear),
+    ExtendedBabyBear(ExtendedBabyBear)
+}
 #[derive(Debug, Clone, Default)]
-pub struct ExtensionBCAssignment<F: BfBaseField, EF: BfExtensionField<F>> {
-    pub ebcs: HashMap<EF, BitCommitExtension<F, EF>>,
-    pub bc_assign: BCAssignment<F>,
+pub struct ExtensionBCAssignment {
+    pub ebb_bcs: HashMap<ExtendedBabyBear, BitCommitExtension<ExtendedBabyBear>>,
+    pub bb_bcs:  HashMap<BabyBear, BitCommitExtension<BabyBear>>,
 }
 
-impl<F: BfBaseField, EF: BfExtensionField<F>> ExtensionBCAssignment<F, EF> {
+impl ExtensionBCAssignment {
     pub fn new() -> Self {
         Self {
-            ebcs: HashMap::new(),
-            bc_assign: BCAssignment::new(),
+            ebb_bcs:HashMap::new(),
+            bb_bcs:HashMap::new(),
         }
     }
 

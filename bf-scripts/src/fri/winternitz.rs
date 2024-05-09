@@ -20,7 +20,7 @@ use std::marker::PhantomData;
 pub use bitcoin_script::{define_pushable, script};
 
 pub use crate::execute_script;
-use crate::{BaseCanCommit, BfField};
+use crate::{BfField};
 
 define_pushable!();
 use bitcoin::hashes::{hash160, Hash};
@@ -50,21 +50,28 @@ pub const N1_INS: usize = 2;
 /// Total number of digits to be signed
 pub const N_INS: usize = N0_INS + N1_INS;
 
+
+const N: usize = 10;
+const N0: usize = 8;
+const N1: usize = 2;
 //
 // Helper functions
 //
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
-pub struct Winternitz<F: BaseCanCommit> {
+pub struct Winternitz<F: BfField> {
     secret_key: String,
     pub_key: Vec<Vec<u8>>,
     _marker: PhantomData<F>,
 }
 
-impl<F: BaseCanCommit> Winternitz<F> {
+impl<F: BfField> Winternitz<F> {
     pub fn new(secret_key: &str) -> Self {
         let mut pubkey = Vec::new();
-        for i in 0..F::N {
-            pubkey.push(generate_public_key(&secret_key, i as u32));
+        
+        for element in F::U32_SIZE{
+            for i in 0..N {
+                pubkey.push(generate_public_key(&secret_key, i as u32));
+            }
         }
         Self {
             secret_key: String::from(secret_key),

@@ -6,6 +6,7 @@ pub mod field;
 pub use field::*;
 pub mod bitcom;
 pub use bitcom::*;
+pub mod bit_comm;
 pub mod bitcom_extension;
 pub use bitcom_extension::*;
 pub mod point;
