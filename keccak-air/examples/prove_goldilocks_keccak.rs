@@ -6,11 +6,9 @@ use p3_fri::{FriConfig, TwoAdicFriPcs};
 use p3_goldilocks::Goldilocks;
 use p3_keccak::Keccak256Hash;
 use p3_keccak_air::{generate_trace_rows, KeccakAir};
-use p3_matrix::Matrix;
 use p3_merkle_tree::FieldMerkleTreeMmcs;
 use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher64};
 use p3_uni_stark::{prove, verify, StarkConfig, VerificationError};
-use p3_util::log2_ceil_usize;
 use rand::random;
 use tracing_forest::util::LevelFilter;
 use tracing_forest::ForestLayer;
@@ -18,7 +16,7 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{EnvFilter, Registry};
 
-const NUM_HASHES: usize = 680;
+const NUM_HASHES: usize = 1365;
 
 fn main() -> Result<(), VerificationError> {
     let env_filter = EnvFilter::builder()
@@ -62,15 +60,15 @@ fn main() -> Result<(), VerificationError> {
         mmcs: challenge_mmcs,
     };
     type Pcs = TwoAdicFriPcs<Val, Dft, ValMmcs, ChallengeMmcs>;
-    let pcs = Pcs::new(log2_ceil_usize(trace.height()), dft, val_mmcs, fri_config);
+    let pcs = Pcs::new(dft, val_mmcs, fri_config);
 
     type MyConfig = StarkConfig<Pcs, Challenge, Challenger>;
     let config = MyConfig::new(pcs);
 
     let mut challenger = Challenger::from_hasher(vec![], byte_hash);
 
-    let proof = prove::<MyConfig, _>(&config, &KeccakAir {}, &mut challenger, trace);
+    let proof = prove(&config, &KeccakAir {}, &mut challenger, trace, &vec![]);
 
     let mut challenger = Challenger::from_hasher(vec![], byte_hash);
-    verify(&config, &KeccakAir {}, &mut challenger, &proof)
+    verify(&config, &KeccakAir {}, &mut challenger, &proof, &vec![])
 }

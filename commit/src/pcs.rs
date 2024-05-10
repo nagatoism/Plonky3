@@ -5,6 +5,7 @@ use core::fmt::Debug;
 
 use p3_field::ExtensionField;
 use p3_matrix::dense::RowMajorMatrix;
+use p3_matrix::Matrix;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -27,10 +28,11 @@ where
     type ProverData;
 
     /// The opening argument.
-    type Proof: Serialize + DeserializeOwned;
+    type Proof: Clone + Serialize + DeserializeOwned;
 
     type Error: Debug;
 
+    /// This should return a coset domain (s.t. Domain::next_point returns Some)
     fn natural_domain_for_degree(&self, degree: usize) -> Self::Domain;
 
     #[allow(clippy::type_complexity)]
@@ -39,12 +41,12 @@ where
         evaluations: Vec<(Self::Domain, RowMajorMatrix<Val<Self::Domain>>)>,
     ) -> (Self::Commitment, Self::ProverData);
 
-    fn get_evaluations_on_domain(
+    fn get_evaluations_on_domain<'a>(
         &self,
-        prover_data: &Self::ProverData,
+        prover_data: &'a Self::ProverData,
         idx: usize,
         domain: Self::Domain,
-    ) -> RowMajorMatrix<Val<Self::Domain>>;
+    ) -> impl Matrix<Val<Self::Domain>> + 'a;
 
     fn open(
         &self,

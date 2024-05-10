@@ -1,16 +1,18 @@
-use itertools::Itertools;
-use p3_baby_bear::{BabyBear, DiffusionMatrixBabybear};
+use core::cmp::Reverse;
+use std::marker::PhantomData;
+
+use p3_baby_bear::{BabyBear, DiffusionMatrixBabyBear};
 use p3_challenger::{CanSampleBits, DuplexChallenger, FieldChallenger};
 use p3_commit::ExtensionMmcs;
 use p3_dft::{Radix2Dit, TwoAdicSubgroupDft};
 use p3_field::extension::BinomialExtensionField;
 use p3_field::{AbstractField, Field};
-use p3_fri::{prover, verifier, FriConfig};
+use p3_fri::{prover, verifier, FriConfig, TwoAdicFriGenericConfig};
 use p3_matrix::dense::RowMajorMatrix;
 use p3_matrix::util::reverse_matrix_index_bits;
-use p3_matrix::{Matrix, MatrixRows};
+use p3_matrix::Matrix;
 use p3_merkle_tree::FieldMerkleTreeMmcs;
-use p3_poseidon2::Poseidon2;
+use p3_poseidon2::{Poseidon2, Poseidon2ExternalMatrixGeneral};
 use p3_symmetric::{PaddingFreeSponge, TruncatedPermutation};
 use p3_util::log2_strict_usize;
 use rand::{Rng, SeedableRng};
@@ -19,7 +21,7 @@ use rand_chacha::ChaCha20Rng;
 type Val = BabyBear;
 type Challenge = BinomialExtensionField<Val, 4>;
 
-type Perm = Poseidon2<Val, DiffusionMatrixBabybear, 16, 7>;
+type Perm = Poseidon2<Val, Poseidon2ExternalMatrixGeneral, DiffusionMatrixBabyBear, 16, 7>;
 type MyHash = PaddingFreeSponge<Perm, 16, 8, 8>;
 type MyCompress = TruncatedPermutation<Perm, 2, 8, 16>;
 type ValMmcs =
@@ -29,7 +31,7 @@ type Challenger = DuplexChallenger<Val, Perm, 16>;
 type MyFriConfig = FriConfig<ChallengeMmcs>;
 
 fn get_ldt_for_testing<R: Rng>(rng: &mut R) -> (Perm, MyFriConfig) {
-    let perm = Perm::new_from_rng(8, 22, DiffusionMatrixBabybear, rng);
+    let perm = Perm::new_from_rng_128(Poseidon2ExternalMatrixGeneral, DiffusionMatrixBabyBear, rng);
     let hash = MyHash::new(perm.clone());
     let compress = MyCompress::new(perm.clone());
     let mmcs = ChallengeMmcs::new(ValMmcs::new(hash, compress));
@@ -57,7 +59,7 @@ fn do_test_fri_ldt<R: Rng>(rng: &mut R) {
         })
         .collect();
 
-    let (proof, reduced_openings, p_sample) = {
+    let (proof, p_sample) = {
         // Prover world
         let mut chal = Challenger::new(perm.clone());
         let alpha: Challenge = chal.sample_ext_element();
@@ -83,38 +85,40 @@ fn do_test_fri_ldt<R: Rng>(rng: &mut R) {
             }
         });
 
-        let (proof, idxs) = prover::prove(&fc, &input, &mut chal);
+        let input: Vec<Vec<Challenge>> = input.into_iter().rev().flatten().collect();
 
-        let log_max_height = input.iter().rposition(Option::is_some).unwrap();
-        let reduced_openings: Vec<[Challenge; 32]> = idxs
-            .into_iter()
-            .map(|idx| {
-                input
-                    .iter()
-                    .enumerate()
-                    .map(|(log_height, v)| {
-                        if let Some(v) = v {
-                            v[idx >> (log_max_height - log_height)]
-                        } else {
-                            Challenge::zero()
-                        }
-                    })
-                    .collect_vec()
-                    .try_into()
-                    .unwrap()
-            })
-            .collect();
+        let log_max_height = log2_strict_usize(input[0].len());
 
-        (proof, reduced_openings, chal.sample_bits(8))
+        let proof = prover::prove(
+            &TwoAdicFriGenericConfig::<Vec<(usize, Challenge)>, ()>(PhantomData),
+            &fc,
+            input.clone(),
+            &mut chal,
+            |idx| {
+                // As our "input opening proof", just pass through the literal reduced openings.
+                let mut ro = vec![];
+                for v in &input {
+                    let log_height = log2_strict_usize(v.len());
+                    ro.push((log_height, v[idx >> (log_max_height - log_height)]));
+                }
+                ro.sort_by_key(|(lh, _)| Reverse(*lh));
+                ro
+            },
+        );
+
+        (proof, chal.sample_bits(8))
     };
 
     let mut v_challenger = Challenger::new(perm);
     let _alpha: Challenge = v_challenger.sample_ext_element();
-    let fri_challenges =
-        verifier::verify_shape_and_sample_challenges(&fc, &proof, &mut v_challenger)
-            .expect("failed verify shape and sample");
-    verifier::verify_challenges(&fc, &proof, &fri_challenges, &reduced_openings)
-        .expect("failed verify challenges");
+    verifier::verify(
+        &TwoAdicFriGenericConfig::<Vec<(usize, Challenge)>, ()>(PhantomData),
+        &fc,
+        &proof,
+        &mut v_challenger,
+        |_index, proof| Ok(proof.clone()),
+    )
+    .unwrap();
 
     assert_eq!(
         p_sample,

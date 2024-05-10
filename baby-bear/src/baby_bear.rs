@@ -2,6 +2,7 @@ use core::fmt::{self, Debug, Display, Formatter};
 use core::iter::{Product, Sum};
 use core::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub, SubAssign};
 
+use num_bigint::BigUint;
 use p3_field::{
     exp_1725656503, exp_u64_by_squaring, halve_u32, AbstractField, Field, Packable, PrimeField,
     PrimeField32, PrimeField64, TwoAdicField,
@@ -11,24 +12,12 @@ use rand::Rng;
 use serde::{Deserialize, Deserializer, Serialize};
 
 /// The Baby Bear prime
+/// This is the unique 31-bit prime with the highest possible 2 adicity (27).
 const P: u32 = 0x78000001;
-
-// We want a different set of parameters on ARM/NEON than elsewhere. In particular, we want ARM to
-// use 31 bits for the limb size, because that lets us use the SQDMULH instruction to do really fast
-// multiplications in NEON. However, other architectures don't have this instruction, so 32-bit
-// limbs are more convenient, being a nice power of 2.
-const MONTY_BITS: u32 = if cfg!(all(target_arch = "aarch64", target_feature = "neon")) {
-    31
-} else {
-    32
-};
+const MONTY_BITS: u32 = 32;
 // We are defining MU = P^-1 (mod 2^MONTY_BITS). This is different from the usual convention
 // (MU = -P^-1 (mod 2^MONTY_BITS)) but it avoids a carry.
-const MONTY_MU: u32 = if cfg!(all(target_arch = "aarch64", target_feature = "neon")) {
-    0x08000001
-} else {
-    0x88000001
-};
+const MONTY_MU: u32 = 0x88000001;
 
 // This is derived from above.
 const MONTY_MASK: u32 = ((1u64 << MONTY_BITS) - 1) as u32;
@@ -80,7 +69,7 @@ impl Distribution<BabyBear> for Standard {
     #[inline]
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> BabyBear {
         loop {
-            let next_u31 = rng.next_u32() & 0x7ffffff;
+            let next_u31 = rng.next_u32() >> 1;
             let is_canonical = next_u31 < P;
             if is_canonical {
                 return BabyBear { value: next_u31 };
@@ -186,11 +175,30 @@ impl AbstractField for BabyBear {
 impl Field for BabyBear {
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     type Packing = crate::PackedBabyBearNeon;
-    #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
+    #[cfg(all(
+        target_arch = "x86_64",
+        target_feature = "avx2",
+        not(all(feature = "nightly-features", target_feature = "avx512f"))
+    ))]
     type Packing = crate::PackedBabyBearAVX2;
+    #[cfg(all(
+        feature = "nightly-features",
+        target_arch = "x86_64",
+        target_feature = "avx512f"
+    ))]
+    type Packing = crate::PackedBabyBearAVX512;
     #[cfg(not(any(
         all(target_arch = "aarch64", target_feature = "neon"),
-        all(target_arch = "x86_64", target_feature = "avx2"),
+        all(
+            target_arch = "x86_64",
+            target_feature = "avx2",
+            not(all(feature = "nightly-features", target_feature = "avx512f"))
+        ),
+        all(
+            feature = "nightly-features",
+            target_arch = "x86_64",
+            target_feature = "avx512f"
+        ),
     )))]
     type Packing = Self;
 
@@ -245,9 +253,18 @@ impl Field for BabyBear {
             value: halve_u32::<P>(self.value),
         }
     }
+
+    #[inline]
+    fn order() -> BigUint {
+        P.into()
+    }
 }
 
-impl PrimeField for BabyBear {}
+impl PrimeField for BabyBear {
+    fn as_canonical_biguint(&self) -> BigUint {
+        <Self as PrimeField32>::as_canonical_u32(self).into()
+    }
+}
 
 impl PrimeField64 for BabyBear {
     const ORDER_U64: u64 = <Self as PrimeField32>::ORDER_U32 as u64;
@@ -334,7 +351,7 @@ impl Sum for BabyBear {
         // There might be a faster reduction method possible for lengths <= 16 which avoids %.
 
         // This sum will not overflow so long as iter.len() < 2^33.
-        let sum = iter.map(|x| (x.value as u64)).sum::<u64>();
+        let sum = iter.map(|x| x.value as u64).sum::<u64>();
         BabyBear {
             value: (sum % P as u64) as u32,
         }
@@ -430,20 +447,20 @@ pub(crate) const fn to_babybear_array<const N: usize>(input: [u32; N]) -> [BabyB
 
 #[inline]
 #[must_use]
-fn to_monty_64(x: u64) -> u32 {
+const fn to_monty_64(x: u64) -> u32 {
     (((x as u128) << MONTY_BITS) % P as u128) as u32
 }
 
 #[inline]
 #[must_use]
-fn from_monty(x: u32) -> u32 {
+const fn from_monty(x: u32) -> u32 {
     monty_reduce(x as u64)
 }
 
 /// Montgomery reduction of a value in `0..P << MONTY_BITS`.
 #[inline]
 #[must_use]
-fn monty_reduce(x: u64) -> u32 {
+pub(crate) const fn monty_reduce(x: u64) -> u32 {
     let t = x.wrapping_mul(MONTY_MU as u64) & (MONTY_MASK as u64);
     let u = t * (P as u64);
 
@@ -455,6 +472,8 @@ fn monty_reduce(x: u64) -> u32 {
 
 #[cfg(test)]
 mod tests {
+    use core::array;
+
     use p3_field_testing::{test_field, test_two_adic_field};
 
     use super::*;
@@ -470,6 +489,15 @@ mod tests {
                 base.exp_power_of_2(BabyBear::TWO_ADICITY - bits)
             );
         }
+    }
+
+    #[test]
+    fn test_to_babybear_array() {
+        let range_array: [u32; 32] = array::from_fn(|i| i as u32);
+        assert_eq!(
+            to_babybear_array(range_array),
+            range_array.map(F::from_canonical_u32)
+        )
     }
 
     #[test]

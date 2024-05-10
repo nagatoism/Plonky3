@@ -24,7 +24,7 @@ where
 {
     type Value = [T; N];
 
-    fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
+    fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         formatter.write_fmt(format_args!("an array of length {}", N))
     }
 
@@ -35,7 +35,7 @@ where
     {
         let mut data = Vec::with_capacity(N);
         for _ in 0..N {
-            match (seq.next_element())? {
+            match seq.next_element()? {
                 Some(val) => data.push(val),
                 None => return Err(serde::de::Error::invalid_length(N, &self)),
             }
