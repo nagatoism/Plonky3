@@ -2,44 +2,48 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 
 use bitcoin::opcodes::{OP_EQUAL, OP_EQUALVERIFY, OP_TOALTSTACK};
+use bitcoin::p2p::message;
 use bitcoin::ScriptBuf as Script;
 use bitcoin_script::{define_pushable, script};
+use itertools::Itertools;
 use p3_baby_bear::BabyBear;
 
 use super::winternitz::*;
 use super::BfField;
-use crate::{u31ext_equalverify};
+use crate::{u31ext_equalverify, winternitz};
 use crate::u32_std::u32_compress;
 
 define_pushable!();
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct BitCommitment<F: BfField> {
-    pub value: Vec<u32>,
-    pub winternitz: Vec<Winternitz<F>>,
+pub struct BitCommitment<F> {
+    pub value: F,
+    pub winternitz: Vec<Winternitz>,
     pub message: Vec<u8>, // every u8 only available for 4-bits
-    _marker: PhantomData<F>,
 }
 
 
 impl<F: BfField> BitCommitment<F> {
     pub fn new(secret_key: &str, value: F) -> Self {
-        let value = value.as_u32_vec();
-        let winternitz = Winternitz::<F>::new(&secret_key);
-        let message = to_digits(value, F::N0);
+       
+        let winternitz = vec![Winternitz::new(&secret_key);F::U32_SIZE];
+        
+        let message = value.as_u32_vec().iter().map(|elem| {
+            to_digits(*elem, winternitz::N)
+        }).flatten().collect_vec();
+        
         Self {
             value,
             winternitz,
             message,
-            _marker: PhantomData,
         }
     }
 
     pub fn commit_u32_as_4bytes(&self) -> Vec<u8> {
         let message = self.message.clone();
-        let mut commit_message = vec![0u8; F::N0 / 2];
-        for i in 0..F::N0 / 2 {
-            let index = F::N0 / 2 - 1 - i;
+        let mut commit_message = vec![0u8; winternitz::N0 / 2];
+        for i in 0..winternitz::N0 / 2 {
+            let index = winternitz::N0 / 2 - 1 - i;
             commit_message[i] = message[2 * index] ^ (message[2 * index + 1] << 4);
         }
         commit_message
@@ -48,18 +52,18 @@ impl<F: BfField> BitCommitment<F> {
     pub fn commit_u32_as_4bytes_script(&self) -> Script {
         let commit_message = self.commit_u32_as_4bytes();
         script! {
-            for i in 0..F::N0/2{
-                {commit_message[ F::N0 / 2 - 1 - i]} OP_EQUALVERIFY
+            for i in 0..winternitz::N0/2{
+                {commit_message[ winternitz::N0 / 2 - 1 - i]} OP_EQUALVERIFY
             }
         }
     }
 
     pub fn check_equal_x_or_neg_x_script(&self, neg_x: &BitCommitment<F>) -> Script {
         script! {
-            for i in 0..F::N0/2{
+            for i in 0..winternitz::N0/2{
                 OP_DUP
-                {self.commit_u32_as_4bytes()[ F::N0 / 2 - 1 - i]} OP_EQUAL OP_SWAP
-                {neg_x.commit_u32_as_4bytes()[ F::N0 / 2 - 1 - i]} OP_EQUAL OP_ADD
+                {self.commit_u32_as_4bytes()[ winternitz::N0 / 2 - 1 - i]} OP_EQUAL OP_SWAP
+                {neg_x.commit_u32_as_4bytes()[ winternitz::N0 / 2 - 1 - i]} OP_EQUAL OP_ADD
                 OP_1 OP_EQUALVERIFY
             }
         }
@@ -67,7 +71,7 @@ impl<F: BfField> BitCommitment<F> {
 
     pub fn checksig_verify_script(&self) -> Script {
         script! {
-            {self.winter.checksig_verify(self.winter.pub_key().as_slice())}
+            {self.winternitz[0].checksig_verify(self.winternitz[0].pub_key().as_slice())}
         }
     }
 
