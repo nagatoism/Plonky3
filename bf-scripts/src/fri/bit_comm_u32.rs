@@ -110,12 +110,12 @@ mod test {
     use rand::Rng;
 
     use super::*;
-    use crate::execute_script_with_inputs;
+    use crate::{bit_comm::BitCommitment, execute_script_with_inputs};
 
     #[test]
     fn test_bit_commit_with_compressu32() {
         let value = BabyBear::from_u32(0x11654321);
-        let x_commitment = BitCommit::new("0000", value);
+        let x_commitment = BitCommitmentU32::new("0000", value.as_u32_vec()[0]);
 
         let signature = x_commitment.signature();
         // let exec_scripts = script! {
@@ -138,7 +138,7 @@ mod test {
 
     #[test]
     fn test_bit_commmit_sig_and_verify() {
-        let x_commitment = BitCommit::new("0000", BabyBear::from_u32(0x11654321));
+        let x_commitment = BitCommitmentU32::new("0000", 0x11654321);
         assert_eq!(
             x_commitment.commit_u32_as_4bytes(),
             [0x11, 0x65, 0x43, 0x21]
@@ -173,9 +173,9 @@ mod test {
             let random_number: u32 = rng.gen();
             let n = random_number % BabyBear::MOD;
 
-            let x_commitment = BitCommit::new(
+            let x_commitment = BitCommitmentU32::new(
                 "b138982ce17ac813d505b5b40b665d404e9528e8",
-                BabyBear::from_u32(n),
+                n
             );
             println!("{:?}", x_commitment.commit_u32_as_4bytes());
 

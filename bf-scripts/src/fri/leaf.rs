@@ -144,8 +144,7 @@ mod test {
     use rand::Rng;
 
     use super::*;
-    use crate::fri::field::BaseCanCommit;
-    use crate::{execute_script_with_inputs, BfBaseField, BitsCommitment};
+    use crate::{execute_script_with_inputs};
 
     #[test]
     fn test_leaf_execution() {
@@ -168,7 +167,7 @@ mod test {
             let signature = leaf.evaluations_commitments[num_polys - 1 - i].commitments[0].signature();
             signature.iter().for_each(|item| sigs.push(item.to_vec()));
         }
-        let signature = leaf.x_commitment..commitments[0].signature();
+        let signature = leaf.x_commitment.commitments[0].signature();
         signature.iter().for_each(|item| sigs.push(item.to_vec()));
 
         println!("{:?}", script);
@@ -192,16 +191,12 @@ mod test {
         let leaf =
             EvaluationLeaf::<num_polys, BabyBear>::new(0, x, vec![BabyBear::from_u32(0x11654321)]);
 
-        assert_eq!(x.as_u32(), leaf.x_commitment.origin_value);
-        assert_eq!(neg_x.as_u32(), leaf.neg_x_commitment.origin_value);
-        println!("{}", format!("{:X}", neg_x.as_u32()));
-
         // check signature and verify the value
         let signature = leaf.x_commitment.commitments[0].signature();
         // check equal to r
         let exec_scripts = script! {
-            { leaf.x_commitment.checksig_verify_script() }
-            { leaf.x_commitment.check_equal_x_or_neg_x_script(&leaf.neg_x_commitment) }
+            { leaf.x_commitment.commitments[0].checksig_verify_script() }
+            { leaf.x_commitment.commitments[0].check_equal_x_or_neg_x_script(&leaf.neg_x_commitment.commitments[0]) }
             OP_1
         };
         let exec_result = execute_script_with_inputs(exec_scripts, signature);
@@ -210,8 +205,8 @@ mod test {
         // check equal to -r
         let signature = leaf.x_commitment.commitments[0].signature();
         let exec_scripts = script! {
-            { leaf.x_commitment.checksig_verify_script() }
-            { leaf.neg_x_commitment.check_equal_x_or_neg_x_script(&leaf.x_commitment) }
+            { leaf.x_commitment.commitments[0].checksig_verify_script() }
+            { leaf.neg_x_commitment.commitments[0].check_equal_x_or_neg_x_script(&leaf.x_commitment.commitments[0]) }
             OP_1
         };
         let exec_result = execute_script_with_inputs(exec_scripts, signature);
@@ -229,14 +224,12 @@ mod test {
                 vec![BabyBear::from_u32(0x11654321)],
             );
 
-            assert_eq!(x.as_u32(), leaf.x_commitment.origin_value);
-            assert_eq!(neg_x.as_u32(), leaf.neg_x_commitment.origin_value);
             // check signature and verify the value
             let signature = leaf.x_commitment.commitments[0].signature();
             // check equal to r
             let exec_scripts = script! {
-                { leaf.x_commitment.checksig_verify_script() }
-                { leaf.x_commitment.check_equal_x_or_neg_x_script(&leaf.neg_x_commitment) }
+                { leaf.x_commitment.commitments[0].checksig_verify_script() }
+                { leaf.x_commitment.commitments[0].check_equal_x_or_neg_x_script(&leaf.neg_x_commitment.commitments[0]) }
                 OP_1
             };
             let exec_result = execute_script_with_inputs(exec_scripts, signature);
@@ -245,8 +238,8 @@ mod test {
             // check equal to -r
             let signature = leaf.x_commitment.commitments[0].signature();
             let exec_scripts = script! {
-                { leaf.x_commitment.checksig_verify_script() }
-                { leaf.neg_x_commitment.check_equal_x_or_neg_x_script(&leaf.x_commitment) }
+                { leaf.x_commitment.commitments[0].checksig_verify_script() }
+                { leaf.neg_x_commitment.commitments[0].check_equal_x_or_neg_x_script(&leaf.x_commitment.commitments[0]) }
                 OP_1
             };
             let exec_result = execute_script_with_inputs(exec_scripts, signature);
@@ -254,8 +247,8 @@ mod test {
 
             let signature = leaf.neg_x_commitment.commitments[0].signature();
             let exec_scripts = script! {
-                { leaf.neg_x_commitment.checksig_verify_script() }
-                { leaf.x_commitment.check_equal_x_or_neg_x_script(&leaf.neg_x_commitment) }
+                { leaf.neg_x_commitment.commitments[0].checksig_verify_script() }
+                { leaf.x_commitment.commitments[0].check_equal_x_or_neg_x_script(&leaf.neg_x_commitment.commitments[0]) }
                 OP_1
             };
             let exec_result = execute_script_with_inputs(exec_scripts, signature);

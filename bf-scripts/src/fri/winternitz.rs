@@ -350,7 +350,7 @@ mod test {
 
         let script = script! {
             { winter.sign_script(& MESSAGE) } // digit 0 = [checkum hash_i]
-            { winter. (pubkey.as_slice()) }// using secret key to generate pubkey
+            { winter.(pubkey.as_slice()) }// using secret key to generate pubkey
 
             0x21 OP_EQUALVERIFY
             0x43 OP_EQUALVERIFY

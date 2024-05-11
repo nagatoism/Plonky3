@@ -96,12 +96,6 @@ mod tests {
         assert_eq!(BabyBear::field_mod() - subgroups[0], subgroups[2]);
     }
 
-    #[test]
-    fn test_from_to_u32() {
-        let n = 0x1234;
-        let b_n = BabyBear::from_u32(n);
-        assert_eq!(n, b_n.as_u32());
-    }
 }
 
 // impl NativeField for u32{

@@ -86,19 +86,19 @@ mod tests {
     #[test]
     fn test_assign_bitcommits() {
         use super::*;
-        let key_origin = 123;
+        let key= 123;
         let bc_assign: &mut BCAssignment= &mut BCAssignment::new();
-        let mut bc_temp: BitCommitment = BitCommitment::new("1223", key);
+        let mut bc_temp: BitCommitmentU32 = BitCommitmentU32::new("1223", key);
         {
             bc_assign.force_insert(key);
-            let bc: &BitCommitment = bc_assign.get(key).unwrap();
-            assert_eq!(bc.origin_value, key_origin);
+            let bc: BitCommitmentU32 = bc_assign.get(key).unwrap();
+            assert_eq!(bc.value, key);
             bc_temp = bc.clone();
         }
 
         {
-            let bc1: &BitCommitment<F> = bc_assign.assign(key);
-            assert_eq!(bc1, &bc_temp);
+            let bc1: BitCommitmentU32 = bc_assign.assign(key);
+            assert_eq!(bc1, bc_temp);
         }
     }
 }

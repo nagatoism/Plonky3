@@ -156,9 +156,9 @@ mod test {
         let a = rng.gen::<EF>();
         let b = rng.gen::<EF>();
         let a_commit =
-            BitCommitExtension::<F, EF>::new("b138982ce17ac813d505b5b40b665d404e9528e7", a);
+            BitCommitment::new("b138982ce17ac813d505b5b40b665d404e9528e7", a);
         let b_commit =
-            BitCommitExtension::<F, EF>::new("b138982ce17ac813d505b5b40b665d404e9528e6", b);
+            BitCommitment::new("b138982ce17ac813d505b5b40b665d404e9528e6", b);
 
         let c = a.add(b);
 
@@ -200,7 +200,7 @@ mod test {
         let a = rng.gen::<EF>();
 
         let a_commit =
-            BitCommitExtension::<F, EF>::new("b138982ce17ac813d505b5b40b665d404e9528e7", a);
+            BitCommitment::new("b138982ce17ac813d505b5b40b665d404e9528e7", a);
 
         let a: &[F] = a.as_base_slice();
         let script = script! {

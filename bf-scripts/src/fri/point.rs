@@ -163,7 +163,7 @@ mod test {
 
     use super::*;
     use crate::fri::field::BfField;
-    use crate::{execute_script_with_inputs, BaseCanCommit, BitCommitExtension};
+    use crate::{execute_script_with_inputs};
 
     type F = BabyBear;
     type EF = p3_field::extension::BinomialExtensionField<BabyBear, 4>;
@@ -189,7 +189,7 @@ mod test {
         let a = rng.gen::<EF>();
         let b = rng.gen::<EF>();
 
-        let p = ExtensionPoint::<F, EF>::new(a, b);
+        let p = Point::new(a, b);
 
         let script = script! {
             {p.recover_point_euqal_to_commited_point()}
@@ -228,7 +228,7 @@ mod test {
         let c = rng.gen::<EF>();
         let d = rng.gen::<EF>();
 
-        let p = ExtensionPoints::<F, EF>::new(a, b, c, d);
+        let p = Points::new(a, b, c, d);
 
         let script = script! {
             {p.recover_points_euqal_to_commited_points()}

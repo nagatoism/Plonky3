@@ -227,10 +227,10 @@ mod test {
                 let y_1_x_quare = y1[x_index % (n / 2)];
                 let script = fold_degree::<BabyBearU31>(
                     2,
-                    x.as_u32(),
+                    x.as_u32_vec()[0],
                     y0_x,
                     y0_neg_x,
-                    beta.as_u32(),
+                    beta.as_u32_vec()[0],
                     y_1_x_quare,
                 );
 
