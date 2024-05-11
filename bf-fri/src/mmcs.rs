@@ -1,59 +1,66 @@
-use alloc::ffi::NulError;
+
 use alloc::vec::Vec;
-use core::hash::Hash;
+use p3_field::{AbstractField, PackedField, PackedValue, PrimeField32};
+use serde::{Deserialize, Serialize};
 use core::marker::PhantomData;
 use core::usize;
 
-use bf_scripts::{BfBaseField, BfExtensionField, BfField};
-use bitcoin::io::Error;
-use bitcoin::taproot::{LeafNode, NodeInfo, TaprootBuilderError, TaprootMerkleBranch};
-use bitcoin::{ScriptBuf, TapNodeHash};
+use bf_scripts::{BaseCanCommit, BfBaseField};
+use bitcoin::{TapNodeHash,hashes::Hash as Bitcoin_HASH};
 use p3_commit::{DirectMmcs, Mmcs};
 use p3_matrix::dense::{RowMajorMatrix, RowMajorMatrixView};
-use p3_matrix::{Dimensions, Matrix, MatrixRowSlices};
+use p3_matrix::{Dimensions, Matrix};
 use p3_util::log2_strict_usize;
+use p3_symmetric::Hash;
+use bf_scripts::BabyBear;
 
 use super::error::BfError;
+use crate::hash::NodeHash;
 use crate::prover::{self, BF_MATRIX_WIDTH, DEFAULT_MATRIX_WIDTH};
 use crate::taptree::PolyCommitTree;
 use crate::BfCommitPhaseProofStep;
+
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
-pub struct TapTreeMmcs<F: BfBaseField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize> {
-    pub(crate) tree: PolyCommitTree<NUM_POLY, LOG_POLY_POINTS>,
-    _marker: PhantomData<F>,
+pub struct TapTreeMmcs<P,PW, const DIGEST_ELEMS: usize> {
+    _marker: PhantomData<(P,PW)>,
 }
 
-impl<F: BfBaseField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize>
-    TapTreeMmcs<F, NUM_POLY, LOG_POLY_POINTS>
+impl<P,PW, const DIGEST_ELEMS: usize>
+    TapTreeMmcs<P,PW, DIGEST_ELEMS> where 
 {
     pub fn new() -> Self {
         Self {
-            tree: PolyCommitTree::new(),
             _marker: PhantomData,
         }
     }
 }
-impl<F: BfBaseField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize> Mmcs<F>
-    for TapTreeMmcs<F, NUM_POLY, LOG_POLY_POINTS>
+impl<P,PW, const DIGEST_ELEMS: usize> Mmcs<P::Scalar>
+    for TapTreeMmcs<P,PW, DIGEST_ELEMS> 
+where 
+    P: PackedField,
+    PW: PackedValue,
+    PW::Value: Eq,
+    [PW::Value; DIGEST_ELEMS]: Serialize + for<'de> Deserialize<'de>,
+    <PW as PackedValue>::Value: PrimeField32,
 {
-    type ProverData = PolyCommitTree<NUM_POLY, LOG_POLY_POINTS>;
+    type ProverData = PolyCommitTree<DIGEST_ELEMS>;
     type Proof = BfCommitPhaseProofStep;
-    type Commitment = TapNodeHash;
+    type Commitment = Hash<P::Scalar,PW::Value,DIGEST_ELEMS>;
     type Error = BfError;
-    type Mat<'a> = RowMajorMatrixView<'a, F>;
+    type Mat<'a> = RowMajorMatrixView<'a, P::Scalar>;
 
     fn open_batch(
         &self,
         index: usize,
-        prover_data: &PolyCommitTree<NUM_POLY, LOG_POLY_POINTS>,
-    ) -> (Vec<Vec<F>>, Self::Proof) {
+        prover_data: &PolyCommitTree<DIGEST_ELEMS>,
+    ) -> (Vec<Vec<P::Scalar>>, Self::Proof) {
         unimplemented!()
     }
 
     fn open_taptree(
         &self,
         index: usize,
-        prover_data: &PolyCommitTree<NUM_POLY, LOG_POLY_POINTS>,
+        prover_data: &PolyCommitTree<DIGEST_ELEMS>,
     ) -> Self::Proof {
         let opening_leaf = prover_data.get_leaf(index).unwrap().clone();
         let merkle_branch = opening_leaf.merkle_branch().clone();
@@ -69,13 +76,14 @@ impl<F: BfBaseField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize> Mmcs<F
         proof: &Self::Proof,
         root: &Self::Commitment,
     ) -> Result<(), Self::Error> {
-        let mut first_node_hash = TapNodeHash::from_node_hashes(*root, proof.merkle_branch[0]);
+        let root_node = NodeHash::from_hash(root.clone());
+        let mut first_node_hash = TapNodeHash::from_node_hashes(root_node.tap_node_hash, proof.merkle_branch[0]);
         proof.merkle_branch[1..]
             .into_iter()
             .for_each(|sibling_node| {
                 first_node_hash = TapNodeHash::from_node_hashes(first_node_hash, *sibling_node);
             });
-        if root.clone() == first_node_hash {
+        if root_node.tap_node_hash == first_node_hash {
             Ok(())
         } else {
             Err(BfError::InvalidMerkleProof)
@@ -95,24 +103,33 @@ impl<F: BfBaseField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize> Mmcs<F
         commit: &Self::Commitment,
         dimensions: &[Dimensions],
         index: usize,
-        opened_values: &[Vec<F>],
+        opened_values: &[Vec<P::Scalar>],
         proof: &Self::Proof,
     ) -> Result<(), Self::Error> {
         unimplemented!();
     }
 }
 
-impl<F: BfBaseField, const NUM_POLY: usize, const LOG_POLY_POINTS: usize> DirectMmcs<F>
-    for TapTreeMmcs<F, NUM_POLY, LOG_POLY_POINTS>
+impl<P,PW, const DIGEST_ELEMS: usize> DirectMmcs<P::Scalar>
+    for TapTreeMmcs<P,PW, DIGEST_ELEMS>
+where
+    P: PackedField,
+    PW: PackedValue,
+    PW::Value: Eq,
+    [PW::Value; DIGEST_ELEMS]: Serialize + for<'de> Deserialize<'de>,
+    <PW as PackedValue>::Value: PrimeField32,
+    P::Scalar:BfBaseField,
 {
-    fn commit(&self, inputs: Vec<RowMajorMatrix<F>>) -> (Self::Commitment, Self::ProverData) {
+    fn commit(&self, inputs: Vec<RowMajorMatrix<P::Scalar>>) -> (Self::Commitment, Self::ProverData) {
         assert_eq!(inputs.len(), 1);
         assert_eq!(inputs[0].width, DEFAULT_MATRIX_WIDTH);
 
-        let mut tree = PolyCommitTree::<NUM_POLY, LOG_POLY_POINTS>::new();
+        let log_leaves = log2_strict_usize(inputs[0].height());
+        let mut tree = PolyCommitTree::<DIGEST_ELEMS>::new(log_leaves);
 
         tree.commit_rev_points(inputs[0].values.clone(), inputs[0].width);
         let root = tree.root().clone();
-        (root.node_hash(), tree)
+        let root_hash = NodeHash::<<P as PackedField>::Scalar, <PW as PackedValue>::Value,DIGEST_ELEMS>::from(root.node_hash());
+        (root_hash.to_hash(), tree)
     }
 }

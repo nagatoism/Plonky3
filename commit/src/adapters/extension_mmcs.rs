@@ -94,12 +94,11 @@ where
     InnerMmcs: DirectMmcs<F>,
 {
     fn commit(&self, inputs: Vec<RowMajorMatrix<EF>>) -> (Self::Commitment, Self::ProverData) {
-        self.inner.commit(
-            inputs
-                .into_iter()
-                .map(|mat| mat.flatten_to_base())
-                .collect(),
-        )
+        let matrix = inputs
+            .into_iter()
+            .map(|mat| mat.flatten_to_base())
+            .collect();
+        self.inner.commit(matrix)
     }
 }
 

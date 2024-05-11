@@ -24,14 +24,17 @@ where
 {
     let log_max_height = input.iter().rposition(Option::is_some).unwrap();
 
+    // vec[ commit_tree_1 , commit_tree_2 ,....log_degree ]
     let commit_phase_result = commit_phase(config, input, log_max_height, challenger);
 
     let pow_witness = challenger.grind(config.proof_of_work_bits);
 
+    // vec[rand_0, rand_1]
     let query_indices: Vec<usize> = (0..config.num_queries)
         .map(|_| challenger.sample_bits(log_max_height))
         .collect();
 
+    // each query_proof corresponding to each query index
     let query_proofs = info_span!("query phase").in_scope(|| {
         query_indices
             .iter()
@@ -67,10 +70,14 @@ where
             let index_i_sibling = index_i ^ 1;
             let index_pair = index_i >> 1;
 
+            // opening_proof is the merklepath here
+            // opened_rows is the leaf of merkletree, so we need to check the open_rows-leaf component
+            // because the Matrix is the width 2 what means that two point combine into one leaf
             let (mut opened_rows, opening_proof) = config.mmcs.open_batch(index_pair, commit);
             assert_eq!(opened_rows.len(), 1);
             let opened_row = opened_rows.pop().unwrap();
             assert_eq!(opened_row.len(), 2, "Committed data should be in pairs");
+            // another point from the same leaf(row).
             let sibling_value = opened_row[index_i_sibling % 2];
 
             CommitPhaseProofStep {

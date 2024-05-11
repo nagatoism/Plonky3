@@ -5,6 +5,7 @@ use p3_field::{ExtensionField, Field, PrimeField64};
 use p3_symmetric::{CryptographicPermutation, Hash};
 
 use crate::{CanObserve, CanSample, CanSampleBits, FieldChallenger};
+use bitcoin::{TapNodeHash};
 
 #[derive(Clone)]
 pub struct DuplexChallenger<F, P, const WIDTH: usize>
@@ -100,6 +101,8 @@ where
     }
 }
 
+
+
 // for TrivialPcs
 impl<F, P, const WIDTH: usize> CanObserve<Vec<Vec<F>>> for DuplexChallenger<F, P, WIDTH>
 where
@@ -114,6 +117,8 @@ where
         }
     }
 }
+
+
 
 impl<F, EF, P, const WIDTH: usize> CanSample<EF> for DuplexChallenger<F, P, WIDTH>
 where

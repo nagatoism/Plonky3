@@ -169,10 +169,6 @@ where
             .verify_taptree(step, commit)
             .map_err(FriError::CommitPhaseMmcsError)?;
 
-        // let mut xs: [F; 2] = [x; 2];
-        // // calculate the x-coordiate using index*generator
-        // xs[index_sibling % 2] *= F::two_adic_generator(1);// with subgroup [1,generator]
-        // interpolate and evaluate at beta
         y_r = evals[0] + (beta - xs[0]) * (evals[1] - evals[0]) / (xs[1] - xs[0]);
 
         index = index_pair;

@@ -62,6 +62,8 @@ fn do_test_fri_ldt<R: Rng>(rng: &mut R) {
         let mut chal = Challenger::new(perm.clone());
         let alpha: Challenge = chal.sample_ext_element();
 
+        // input[0] = reduced for highest_matrixs
+        // input[1] =
         let input: [_; 32] = core::array::from_fn(|log_height| {
             let matrices_with_log_height: Vec<&RowMajorMatrix<Val>> = ldes
                 .iter()
@@ -70,11 +72,20 @@ fn do_test_fri_ldt<R: Rng>(rng: &mut R) {
             if matrices_with_log_height.is_empty() {
                 None
             } else {
+                // At here we combines different matrix with same height(highest matrix) together
+                // reduced 的长度跟 matrices的高度相同
                 let reduced: Vec<Challenge> = (0..(1 << log_height))
                     .map(|r| {
                         alpha
                             .powers()
-                            .zip(matrices_with_log_height.iter().flat_map(|m| m.row(r)))
+                            .zip(
+                                // I need to consider that multi-matrixs with same height case
+                                // I guess there it will concat the same-row value from different matrixs
+                                // but still exists a question: how the result calculated by concated(flatted) converts to babybear
+                                // [m1_row(r)] [m2_row(r)] => [m1_row(r)，m2_row(r)]
+                                // m1_row(r) * alpha_pow + m2_row(r) * alpha_pow
+                                matrices_with_log_height.iter().flat_map(|m| m.row(r)),
+                            )
                             .map(|(alpha_pow, v)| alpha_pow * v)
                             .sum()
                     })
@@ -93,6 +104,7 @@ fn do_test_fri_ldt<R: Rng>(rng: &mut R) {
                     .iter()
                     .enumerate()
                     .map(|(log_height, v)| {
+                        // v is the reduced vector
                         if let Some(v) = v {
                             v[idx >> (log_max_height - log_height)]
                         } else {

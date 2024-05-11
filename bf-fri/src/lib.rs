@@ -14,6 +14,7 @@ pub mod error;
 pub mod extension_mmcs;
 pub mod taptree;
 pub mod verifier;
+pub mod hash;
 
 pub use config::*;
 pub use extension_mmcs::*;

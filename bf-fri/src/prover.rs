@@ -23,7 +23,7 @@ where
     Challenger: GrindingChallenger + CanObserve<M::Commitment> + CanSample<F>,
 {
     // ToDo: support Muti-Matrixs
-    assert_eq!(input.len(), 1);
+    // assert_eq!(input.len(), 1);
 
     // 1. rposition start iterator from the end and calculate the valid leagth of the polynomial want commit
     let log_max_height = input.iter().rposition(Option::is_some).unwrap();

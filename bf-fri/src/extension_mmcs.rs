@@ -1,5 +1,6 @@
 use alloc::ffi::NulError;
 use alloc::vec::Vec;
+use p3_util::log2_strict_usize;
 use core::hash::Hash;
 use core::marker::PhantomData;
 use core::usize;
@@ -11,10 +12,9 @@ use bitcoin::{ScriptBuf, TapNodeHash};
 use p3_commit::{DirectMmcs, ExtensionMatrix, Mmcs};
 use p3_matrix::dense::{RowMajorMatrix, RowMajorMatrixView};
 use p3_matrix::{Dimensions, Matrix, MatrixRowSlices};
-use p3_util::log2_strict_usize;
 
 use super::error::BfError;
-use crate::prover::{self, BF_MATRIX_WIDTH, DEFAULT_MATRIX_WIDTH};
+use crate::prover::{DEFAULT_MATRIX_WIDTH};
 use crate::taptree::PolyCommitTree;
 use crate::BfCommitPhaseProofStep;
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
@@ -22,11 +22,9 @@ pub struct ExtensionTapTreeMmcs<
     F: BfBaseField,
     EF: BfExtensionField<F>,
     const NUM_POLY: usize,
-    const LOG_POLY_POINTS: usize,
     InnerMmcs,
 > {
     inner: InnerMmcs,
-    pub(crate) tree: PolyCommitTree<NUM_POLY, LOG_POLY_POINTS>,
     _marker: PhantomData<(F, EF)>,
 }
 
@@ -34,14 +32,12 @@ impl<
         F: BfBaseField,
         EF: BfExtensionField<F>,
         const NUM_POLY: usize,
-        const LOG_POLY_POINTS: usize,
         InnerMmcs,
-    > ExtensionTapTreeMmcs<F, EF, NUM_POLY, LOG_POLY_POINTS, InnerMmcs>
+    > ExtensionTapTreeMmcs<F, EF, NUM_POLY, InnerMmcs>
 {
     pub fn new(inner: InnerMmcs) -> Self {
         Self {
             inner,
-            tree: PolyCommitTree::new(),
             _marker: PhantomData,
         }
     }
@@ -51,11 +47,10 @@ impl<
         F: BfBaseField,
         EF: BfExtensionField<F>,
         const NUM_POLY: usize,
-        const LOG_POLY_POINTS: usize,
         InnerMmcs: Mmcs<F>,
-    > Mmcs<EF> for ExtensionTapTreeMmcs<F, EF, NUM_POLY, LOG_POLY_POINTS, InnerMmcs>
+    > Mmcs<EF> for ExtensionTapTreeMmcs<F, EF, NUM_POLY, InnerMmcs>
 {
-    type ProverData = PolyCommitTree<NUM_POLY, LOG_POLY_POINTS>;
+    type ProverData = PolyCommitTree<NUM_POLY>;
     type Proof = BfCommitPhaseProofStep;
     type Commitment = TapNodeHash;
     type Error = BfError;
@@ -64,7 +59,7 @@ impl<
     fn open_batch(
         &self,
         index: usize,
-        prover_data: &PolyCommitTree<NUM_POLY, LOG_POLY_POINTS>,
+        prover_data: &PolyCommitTree<NUM_POLY>,
     ) -> (Vec<Vec<EF>>, Self::Proof) {
         unimplemented!()
     }
@@ -72,7 +67,7 @@ impl<
     fn open_taptree(
         &self,
         index: usize,
-        prover_data: &PolyCommitTree<NUM_POLY, LOG_POLY_POINTS>,
+        prover_data: &PolyCommitTree<NUM_POLY>,
     ) -> Self::Proof {
         let opening_leaf = prover_data.get_leaf(index).unwrap().clone();
         let merkle_branch = opening_leaf.merkle_branch().clone();
@@ -125,9 +120,8 @@ impl<
         F: BfBaseField,
         EF: BfExtensionField<F>,
         const NUM_POLY: usize,
-        const LOG_POLY_POINTS: usize,
         InnerMmcs,
-    > DirectMmcs<EF> for ExtensionTapTreeMmcs<F, EF, NUM_POLY, LOG_POLY_POINTS, InnerMmcs>
+    > DirectMmcs<EF> for ExtensionTapTreeMmcs<F, EF, NUM_POLY, InnerMmcs>
 where
     InnerMmcs: Mmcs<F>,
 {
@@ -135,7 +129,8 @@ where
         assert_eq!(inputs.len(), 1);
         assert_eq!(inputs[0].width, DEFAULT_MATRIX_WIDTH);
 
-        let mut tree = PolyCommitTree::<NUM_POLY, LOG_POLY_POINTS>::new();
+        let log_leaves = log2_strict_usize(inputs[0].height());
+        let mut tree = PolyCommitTree::<NUM_POLY>::new(log_leaves);
 
         tree.commit_rev_extension_points(inputs[0].values.clone(), inputs[0].width);
         let root = tree.root().clone();

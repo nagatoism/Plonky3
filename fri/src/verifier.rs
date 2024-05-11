@@ -34,6 +34,7 @@ where
     M: Mmcs<F>,
     Challenger: GrindingChallenger + CanObserve<M::Commitment> + CanSample<F>,
 {
+    // generate betas
     let betas: Vec<F> = proof
         .commit_phase_commits
         .iter()
@@ -43,6 +44,7 @@ where
         })
         .collect();
 
+    // Check the number of QueryProof given by prover is equal to the config.num_queries
     if proof.query_proofs.len() != config.num_queries {
         return Err(FriError::InvalidProofShape);
     }
@@ -112,6 +114,7 @@ where
     M: Mmcs<F>,
 {
     let mut folded_eval = F::zero();
+    // equal to the root-of-unity for sibling
     let mut x = F::two_adic_generator(log_max_height)
         .exp_u64(reverse_bits_len(index, log_max_height) as u64);
 

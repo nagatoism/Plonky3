@@ -46,20 +46,20 @@ pub struct LayerTree {}
 pub struct FSTree {}
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
-pub struct FoldingTree<const NUM_POLY: usize, const LOG_POLY_POINTS: usize>(
-    pub BasicTree<NUM_POLY, LOG_POLY_POINTS>,
+pub struct FoldingTree<const NUM_POLY: usize>(
+    pub BasicTree<NUM_POLY>,
 );
 
-impl<const NUM_POLY: usize, const LOG_POLY_POINTS: usize> FoldingTree<NUM_POLY, LOG_POLY_POINTS> {
-    fn new() -> Self {
-        Self(BasicTree::new())
+impl<const NUM_POLY: usize> FoldingTree<NUM_POLY> {
+    fn new(log_poly_points: usize,) -> Self {
+        Self(BasicTree::new(log_poly_points))
     }
 }
 
-impl<const NUM_POLY: usize, const LOG_POLY_POINTS: usize> Deref
-    for FoldingTree<NUM_POLY, LOG_POLY_POINTS>
+impl<const NUM_POLY: usize> Deref
+    for FoldingTree<NUM_POLY>
 {
-    type Target = BasicTree<NUM_POLY, LOG_POLY_POINTS>;
+    type Target = BasicTree<NUM_POLY>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -69,15 +69,12 @@ impl<const NUM_POLY: usize, const LOG_POLY_POINTS: usize> Deref
 // =============== Polycommitment Tree ===============
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
-pub struct PolyCommitTree<const NUM_POLY: usize, const LOG_POLY_POINTS: usize>(
-    pub BasicTree<NUM_POLY, LOG_POLY_POINTS>,
-);
+pub struct PolyCommitTree<const NUM_POLY: usize>(pub BasicTree<NUM_POLY>);
 
-impl<const NUM_POLY: usize, const LOG_POLY_POINTS: usize>
-    PolyCommitTree<NUM_POLY, LOG_POLY_POINTS>
+impl<const NUM_POLY: usize> PolyCommitTree<NUM_POLY>
 {
-    pub fn new() -> Self {
-        Self(BasicTree::new())
+    pub fn new(log_poly_points: usize) -> Self {
+        Self(BasicTree::new(log_poly_points))
     }
 
     pub fn commit_points<F: BfBaseField>(&mut self, evaluations: Vec<F>) {
@@ -152,18 +149,18 @@ impl<const NUM_POLY: usize, const LOG_POLY_POINTS: usize>
     }
 }
 
-impl<const NUM_POLY: usize, const LOG_POLY_POINTS: usize> Deref
-    for PolyCommitTree<NUM_POLY, LOG_POLY_POINTS>
+impl<const NUM_POLY: usize> Deref
+    for PolyCommitTree<NUM_POLY>
 {
-    type Target = BasicTree<NUM_POLY, LOG_POLY_POINTS>;
+    type Target = BasicTree<NUM_POLY>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<const NUM_POLY: usize, const LOG_POLY_POINTS: usize> DerefMut
-    for PolyCommitTree<NUM_POLY, LOG_POLY_POINTS>
+impl<const NUM_POLY: usize> DerefMut
+    for PolyCommitTree<NUM_POLY>
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
@@ -171,16 +168,16 @@ impl<const NUM_POLY: usize, const LOG_POLY_POINTS: usize> DerefMut
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
-pub struct BasicTree<const NUM_POLY: usize, const LOG_POLY_POINTS: usize> {
+pub struct BasicTree<const NUM_POLY: usize> {
     root_node: Option<NodeInfo>,
-    tree_builder: Option<TreeBuilder<LOG_POLY_POINTS>>,
+    tree_builder: Option<TreeBuilder>,
 }
 
-impl<const NUM_POLY: usize, const LOG_POLY_POINTS: usize> BasicTree<NUM_POLY, LOG_POLY_POINTS> {
-    pub fn new() -> Self {
+impl<const NUM_POLY: usize> BasicTree<NUM_POLY> {
+    pub fn new(log_poly_points: usize,) -> Self {
         Self {
             root_node: None,
-            tree_builder: Some(TreeBuilder::new()),
+            tree_builder: Some(TreeBuilder::new(log_poly_points)),
         }
     }
 
@@ -207,12 +204,12 @@ impl<const NUM_POLY: usize, const LOG_POLY_POINTS: usize> BasicTree<NUM_POLY, LO
         root
     }
 
-    pub fn tree_builder(&self) -> &TreeBuilder<LOG_POLY_POINTS> {
+    pub fn tree_builder(&self) -> &TreeBuilder {
         let builder = self.tree_builder.as_ref().unwrap();
         builder
     }
 
-    pub fn mut_tree_builder(&mut self) -> &mut TreeBuilder<LOG_POLY_POINTS> {
+    pub fn mut_tree_builder(&mut self) -> &mut TreeBuilder {
         let builder = self.tree_builder.as_mut().unwrap();
         builder
     }
@@ -260,8 +257,8 @@ impl<const NUM_POLY: usize, const LOG_POLY_POINTS: usize> BasicTree<NUM_POLY, LO
     }
 }
 
-impl<const NUM_POLY: usize, const LOG_POLY_POINTS: usize> From<NodeInfo>
-    for BasicTree<NUM_POLY, LOG_POLY_POINTS>
+impl<const NUM_POLY: usize> From<NodeInfo>
+    for BasicTree<NUM_POLY>
 {
     fn from(value: NodeInfo) -> Self {
         Self {
@@ -272,13 +269,20 @@ impl<const NUM_POLY: usize, const LOG_POLY_POINTS: usize> From<NodeInfo>
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
-pub struct TreeBuilder<const LOG_N: usize> {
+pub struct TreeBuilder {
+    log_leaves: usize,
     leaves: Vec<NodeInfo>,
 }
 
-impl<const LOG_N: usize> TreeBuilder<LOG_N> {
-    pub fn new() -> Self {
-        Self { leaves: Vec::new() }
+impl TreeBuilder {
+    pub fn new(log_n : usize) -> Self {
+        Self {
+            log_leaves:log_n,
+            leaves: Vec::new() }
+    }
+
+    pub fn log_leaves(&self) -> usize{
+        self.log_leaves
     }
 
     pub fn add_leaf(&mut self, leaf_script: ScriptBuf) {
@@ -287,9 +291,9 @@ impl<const LOG_N: usize> TreeBuilder<LOG_N> {
     }
 
     pub fn root(&mut self) -> NodeInfo {
-        assert!(self.leaves.len() as u32 == 2u32.pow(LOG_N as u32));
-        for i in 0..LOG_N {
-            self.build_layer((LOG_N - i) as u32);
+        assert!(self.leaves.len() as u32 == 2u32.pow(self.log_leaves as u32));
+        for i in 0..self.log_leaves {
+            self.build_layer((self.log_leaves - i) as u32);
         }
         assert!(self.leaves.len() == 1);
         self.leaves[0].clone()
@@ -384,7 +388,7 @@ mod tests {
         let eva_poly1 = poly1.convert_to_evals_at_subgroup();
         let evas1 = eva_poly1.values();
 
-        let mut tb = TreeBuilder::<DEPTH>::new();
+        let mut tb = TreeBuilder::new(DEPTH);
 
         for i in 0..evas1.len() {
             let leaf_script = construct_evaluation_leaf_script::<1, F>(
@@ -423,7 +427,7 @@ mod tests {
         let eva_poly1 = poly1.convert_to_evals_at_subgroup();
         let evas1 = eva_poly1.values();
 
-        let mut field_taptree_1 = PolyCommitTree::<1, 2>::new();
+        let mut field_taptree_1 = PolyCommitTree::<1>::new(2);
 
         for i in 0..evas1.len() {
             let leaf_script = construct_evaluation_leaf_script::<1, F>(
@@ -453,7 +457,7 @@ mod tests {
             assert_eq!(inclusion, true);
         });
 
-        let mut field_taptree_2 = PolyCommitTree::<1, 2>::new();
+        let mut field_taptree_2 = PolyCommitTree::<1>::new(2);
 
         for i in 0..evas2.len() {
             let leaf_script = construct_evaluation_leaf_script::<1, F>(
@@ -471,7 +475,7 @@ mod tests {
             assert_eq!(inclusion, true);
         });
 
-        let combined_tree: BasicTree<NUM_POLY, 3> = BasicTree::<F, NUM_POLY, 3>::from(
+        let combined_tree: BasicTree<1> = BasicTree::<1>::from(
             combine_two_nodes(
                 field_taptree_1.root().clone(),
                 field_taptree_2.root().clone(),

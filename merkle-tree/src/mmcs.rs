@@ -171,7 +171,8 @@ where
         inputs: Vec<RowMajorMatrix<P::Scalar>>,
     ) -> (Self::Commitment, Self::ProverData) {
         let tree = FieldMerkleTree::new::<P, PW, H, C>(&self.hash, &self.compress, inputs);
-        let root = tree.root();
+        // [PW;DIGEST_ELEMS] 
+        let root: Hash<<P as PackedField>::Scalar, <PW as PackedValue>::Value, DIGEST_ELEMS>= tree.root();
         (root, tree)
     }
 }
