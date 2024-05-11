@@ -70,14 +70,14 @@ impl BitCommitmentU32 {
         self.winternitz.sign_script(&self.message)
     }
 
-    fn recover_message_at_stack(&self) -> Script {
+    pub (crate) fn recover_message_at_stack(&self) -> Script {
         script! {
             {self.checksig_verify_script()}
             {u32_compress()}
         }
     }
 
-    fn recover_message_at_altstack(&self) -> Script {
+    pub  (crate)  fn recover_message_at_altstack(&self) -> Script {
         script! {
             {self.checksig_verify_script()}
             {u32_compress()}
@@ -86,7 +86,7 @@ impl BitCommitmentU32 {
     }
 
     // signuture is the input of this script
-    fn recover_message_euqal_to_commit_message(&self) -> Script {
+    pub  (crate) fn recover_message_euqal_to_commit_message(&self) -> Script {
         script! {
             {self.recover_message_at_stack()}
             {self.value }
@@ -94,7 +94,7 @@ impl BitCommitmentU32 {
         }
     }
 
-    fn signature(&self) -> Vec<Vec<u8>> {
+    pub (crate)fn signature(&self) -> Vec<Vec<u8>> {
         let mut sig = self.winternitz.sign(&self.message);
         for i in 0..sig.len() {
             if sig[i].len() == 1 && sig[i][0] == 0 {

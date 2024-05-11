@@ -16,7 +16,7 @@ use bitcoin_script::{define_pushable, script};
 
 use super::winternitz::*;
 use super::BfField;
-use crate::{fold_degree, BabyBearU31};
+use crate::{fold_degree, winternitz, BabyBearU31};
 use super::bit_comm::*;
 define_pushable!();
 
@@ -44,11 +44,11 @@ impl<'a, const NUM_POLY: usize, F: BfField> VerifyFoldingLeaf<'a, NUM_POLY, F> {
             y_1_x_square_commitment,
         }
     }
-
+    //TODO finish leaf script for ExtendedBabybear
     fn leaf_script(&self) -> Script {
         fold_degree::<BabyBearU31>(
             2,
-            self.x.as_u32(),
+            self.x.as_u32_vec()[0],
             self.y_0_x_commitment.origin_value,
             self.y_0_neg_x_commitment.origin_value,
             self.beta.origin_value,
@@ -58,8 +58,8 @@ impl<'a, const NUM_POLY: usize, F: BfField> VerifyFoldingLeaf<'a, NUM_POLY, F> {
 
     pub fn check_equal_script(&self) -> Script {
         script! {
-            for i in 0..F::N0/2{
-                {self.y_0_x_commitment.commit_u32_as_4bytes()[ F::N0 / 2 - 1 - i]} OP_EQUALVERIFY
+            for i in 0..winternitz::N0/2{
+                {self.y_0_x_commitment.commitments.commit_u32_as_4bytes()[ F::N0 / 2 - 1 - i]} OP_EQUALVERIFY
             }
         }
     }
