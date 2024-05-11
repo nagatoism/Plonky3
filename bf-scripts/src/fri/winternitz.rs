@@ -17,6 +17,7 @@
 
 use std::marker::PhantomData;
 
+use bitcoin::script::ScriptIntError;
 pub use bitcoin_script::{define_pushable, script};
 
 pub use crate::execute_script;
@@ -266,6 +267,10 @@ impl Winternitz {
             }
 
         }
+   
+    }
+    pub fn checksig_verify_self_pubkey(&self)->Script{
+        self.checksig_verify(&self.pub_key().as_slice())
     }
 }
 /// Generate the public key for the i-th digit of the message
@@ -345,7 +350,7 @@ mod test {
 
         let script = script! {
             { winter.sign_script(& MESSAGE) } // digit 0 = [checkum hash_i]
-            { winter.checksig_verify(pubkey.as_slice()) }// using secret key to generate pubkey
+            { winter. (pubkey.as_slice()) }// using secret key to generate pubkey
 
             0x21 OP_EQUALVERIFY
             0x43 OP_EQUALVERIFY

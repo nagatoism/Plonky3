@@ -10,73 +10,32 @@ use p3_baby_bear::BabyBear;
 
 use super::winternitz::*;
 use super::BfField;
+use crate::bit_comm_u32::BitCommitmentU32;
 use crate::{u31ext_equalverify, winternitz};
 use crate::u32_std::u32_compress;
 
 define_pushable!();
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct BitCommitment<F> {
+pub struct BitCommitment<F:BfField> {
     pub value: F,
-    pub winternitz: Vec<Winternitz>,
-    pub message: Vec<u8>, // every u8 only available for 4-bits
+    pub commitments:Vec<BitCommitmentU32>
 }
 
 
 impl<F: BfField> BitCommitment<F> {
     pub fn new(secret_key: &str, value: F) -> Self {
+        let u32_values = value.as_u32_vec();
+        let commitments = u32_values.iter().map(|v|{
+            let comm = BitCommitmentU32::new(secret_key, *v);
+            comm
+        }).collect_vec();
        
-        let winternitz = vec![Winternitz::new(&secret_key);F::U32_SIZE];
-        
-        let message = value.as_u32_vec().iter().map(|elem| {
-            to_digits(*elem, winternitz::N)
-        }).flatten().collect_vec();
         
         Self {
             value,
-            winternitz,
-            message,
+            commitments
         }
-    }
-
-    pub fn commit_u32_as_4bytes(&self) -> Vec<u8> {
-        let message = self.message.clone();
-        let mut commit_message = vec![0u8; winternitz::N0 / 2];
-        for i in 0..winternitz::N0 / 2 {
-            let index = winternitz::N0 / 2 - 1 - i;
-            commit_message[i] = message[2 * index] ^ (message[2 * index + 1] << 4);
-        }
-        commit_message
-    }
-
-    pub fn commit_u32_as_4bytes_script(&self) -> Script {
-        let commit_message = self.commit_u32_as_4bytes();
-        script! {
-            for i in 0..winternitz::N0/2{
-                {commit_message[ winternitz::N0 / 2 - 1 - i]} OP_EQUALVERIFY
-            }
-        }
-    }
-
-    pub fn check_equal_x_or_neg_x_script(&self, neg_x: &BitCommitment<F>) -> Script {
-        script! {
-            for i in 0..winternitz::N0/2{
-                OP_DUP
-                {self.commit_u32_as_4bytes()[ winternitz::N0 / 2 - 1 - i]} OP_EQUAL OP_SWAP
-                {neg_x.commit_u32_as_4bytes()[ winternitz::N0 / 2 - 1 - i]} OP_EQUAL OP_ADD
-                OP_1 OP_EQUALVERIFY
-            }
-        }
-    }
-
-    pub fn checksig_verify_script(&self) -> Script {
-        script! {
-            {self.winternitz[0].checksig_verify(self.winternitz[0].pub_key().as_slice())}
-        }
-    }
-
-    pub fn signature_script(&self) -> Script {
-        self.winter.sign_script(&self.message)
     }
 }
 
@@ -89,17 +48,19 @@ impl<F: BfField>  BitCommitment<F> {
         // bit_commits[1].sig
         //       ...
         // bit_commits[N].sig
+        let u32_value =self.value.as_u32_vec();
         let script = script! {
             for i in 0..(F::U32_SIZE-1){
-                {self.bit_commits[i].recover_message_euqal_to_commit_message()}
-                {self.bit_commits[i].origin_value}
+                {self.winternitz[i].checksig_verify(self.winternitz[i].pub_key())}
+                {u32_value[i]}
                 OP_TOALTSTACK
             }
 
-            {self.bit_commits[F::U32_SIZE-1].recover_message_euqal_to_commit_message()}
-            {self.bit_commits[F::U32_SIZE-1].origin_value}
+            {self.winternitz[F::U32_SIZE-1].checksig_verify_self_pubkey()}
+            {u32_compress()}
+            {u32_value[F::U32_SIZE-1]}
 
-            for _ in 0..F::D-1{
+            for _ in 0..F::U32_SIZE-1{
                 OP_FROMALTSTACK
             }
             // The stake state looks like below:
@@ -117,10 +78,13 @@ impl<F: BfField>  BitCommitment<F> {
         // bit_commits[1].sig
         //       ...
         // bit_commits[N].sig
+        let u32_value =self.value.as_u32_vec();
         let script = script! {
-            for i in 0..F::D{
-                {self.bit_commits[i].recover_message_euqal_to_commit_message()}
-                {self.bit_commits[i].origin_value}
+            for i in 0..F::U32_SIZE{
+                {self.winternitz[i].checksig_verify_self_pubkey()}
+                {u32_compress()}
+                {OP_TOALTSTACK}
+                {u32_value[i]}
                 OP_TOALTSTACK
             }
 
@@ -149,6 +113,43 @@ impl<F: BfField>  BitCommitment<F> {
             sigs.append(&mut self.bit_commits[i].signature());
         }
         sigs
+    }
+}
+
+
+impl <F:BfField> BitCommitment<F> {
+    fn recover_u32_at_stack(&self) -> Script {
+        script! {
+            {self.checksig_verify_script()}
+            {u32_compress()}
+        }
+    }
+
+    fn recover_u32_at_altstack(&self) -> Script {
+        script! {
+            {self.checksig_verify_script()}
+            {u32_compress()}
+            OP_TOALTSTACK
+        }
+    }
+
+    // signuture is the input of this script
+    fn recover_u32_euqal_to_commit_message(&self) -> Script {
+        script! {
+            {self.recover_u32_at_stack()}
+            {self.value }
+            OP_EQUALVERIFY
+        }
+    }
+
+    fn signature_u32(&self) -> Vec<Vec<u8>> {
+        let mut sig = self.winter.sign(&self.message);
+        for i in 0..sig.len() {
+            if sig[i].len() == 1 && sig[i][0] == 0 {
+                sig[i] = vec![]
+            }
+        }
+        sig
     }
 }
 #[cfg(test)]
