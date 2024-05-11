@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use itertools::Itertools;
 use p3_baby_bear::BabyBear;
 use p3_field::extension::BinomialExtensionField;
 
@@ -41,25 +42,32 @@ impl BCAssignment {
         self.secret_assign.get_secret()
     }
 
-    pub fn force_insert(&mut self, value: u32,) -> &BitCommitmentU32 {
+    pub fn force_insert(&mut self, value: u32,) -> BitCommitmentU32 {
         let bc = BitCommitmentU32::new(self.get_secret(), value);
         self.bcs.insert(value, bc);
         self.get(value).unwrap()
     }
 
-    pub fn get(&self, value: u32) -> Option<&BitCommitmentU32> {
-        self.bcs.get(&value)
+    pub fn get(&self, value: u32) -> Option<BitCommitmentU32> {
+        self.bcs.get(&value).map(|bc|bc.clone())
     }
 
-    pub fn get_mut(&mut self, value: u32) -> Option<&mut BitCommitmentU32> {
-        self.bcs.get_mut(&value)
-    }
+   
 
-    pub fn assign(&mut self, value: u32) -> &BitCommitmentU32 {
+    pub fn assign(&mut self, value: u32) -> BitCommitmentU32 {
         let secret = self.secret_assign.get_secret();
         self.bcs
             .entry(value)
-            .or_insert_with(|| BitCommitmentU32::new(secret, value))
+            .or_insert_with(|| BitCommitmentU32::new(secret, value)).clone()
+    }
+
+    pub fn assign_field<F:BfField>(&mut self, value:F)->BitCommitment<F>{
+       let commitments = value.as_u32_vec().iter().map(|u32_value|{
+            self.assign(*u32_value)
+       }).collect_vec();
+       BitCommitment{ value, commitments }
+
+        
     }
 }
 

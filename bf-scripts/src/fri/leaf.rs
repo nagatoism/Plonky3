@@ -13,13 +13,12 @@ use bitcoin::opcodes::{OP_EQUAL, OP_EQUALVERIFY, OP_SWAP};
 use bitcoin::ScriptBuf as Script;
 use bitcoin_script::{define_pushable, script};
 
-
+use super::bit_comm::*;
 use super::winternitz::*;
 use super::BfField;
 use crate::{fold_degree, winternitz, BabyBearU31};
-use super::bit_comm::*;
 define_pushable!();
-
+//Warning! The code only works for Babybear now
 pub struct VerifyFoldingLeaf<'a, const NUM_POLY: usize, F: BfField> {
     x: F,
     beta: &'a BitCommitment<F>,
@@ -44,22 +43,22 @@ impl<'a, const NUM_POLY: usize, F: BfField> VerifyFoldingLeaf<'a, NUM_POLY, F> {
             y_1_x_square_commitment,
         }
     }
-    //TODO finish leaf script for ExtendedBabybear
+
     fn leaf_script(&self) -> Script {
         fold_degree::<BabyBearU31>(
             2,
             self.x.as_u32_vec()[0],
-            self.y_0_x_commitment.origin_value,
-            self.y_0_neg_x_commitment.origin_value,
-            self.beta.origin_value,
-            self.y_1_x_square_commitment.origin_value,
+            self.y_0_x_commitment.commitments[0].value,
+            self.y_0_neg_x_commitment.commitments[0].value,
+            self.beta.commitments[0].value,
+            self.y_1_x_square_commitment.commitments[0].value,
         )
     }
 
     pub fn check_equal_script(&self) -> Script {
         script! {
             for i in 0..winternitz::N0/2{
-                {self.y_0_x_commitment.commitments.commit_u32_as_4bytes()[ F::N0 / 2 - 1 - i]} OP_EQUALVERIFY
+                {self.y_0_x_commitment.commitments[0].commit_u32_as_4bytes()[ winternitz::N0 / 2 - 1 - i]} OP_EQUALVERIFY
             }
         }
     }
@@ -104,12 +103,12 @@ impl<const NUM_POLY: usize, F: BfField> EvaluationLeaf<NUM_POLY, F> {
     pub fn leaf_script(&self) -> Script {
         // equal to x script
         let scripts = script! {
-            { self.x_commitment.checksig_verify_script() }
-            { self.x_commitment.commit_u32_as_4bytes_script() }
+            { self.x_commitment.commitments[0].checksig_verify_script() }
+            { self.x_commitment.commitments[0].commit_u32_as_4bytes_script() }
             // todo: calculate to equal to -x
             for i in 0..NUM_POLY{
-                { self.evaluations_commitments[NUM_POLY-1-i].checksig_verify_script() }
-                { self.evaluations_commitments[NUM_POLY-1-i].commit_u32_as_4bytes_script() }
+                { self.evaluations_commitments[NUM_POLY-1-i].commitments[0].checksig_verify_script() }
+                { self.evaluations_commitments[NUM_POLY-1-i].commitments[0].commit_u32_as_4bytes_script() }
             }
             OP_1
         };
@@ -120,13 +119,13 @@ impl<const NUM_POLY: usize, F: BfField> EvaluationLeaf<NUM_POLY, F> {
     pub fn two_point_leaf_script(&self) -> Script {
         // equal to x script
         let scripts = script! {
-            { self.x_commitment.checksig_verify_script() }
-            { self.x_commitment.commit_u32_as_4bytes_script() }
-            { self.neg_x_commitment.checksig_verify_script() }
-            { self.neg_x_commitment.commit_u32_as_4bytes_script() }
+            { self.x_commitment.commitments[0].checksig_verify_script() }
+            { self.x_commitment.commitments[0].commit_u32_as_4bytes_script() }
+            { self.neg_x_commitment.commitments[0].checksig_verify_script() }
+            { self.neg_x_commitment.commitments[0].commit_u32_as_4bytes_script() }
             for i in 0..NUM_POLY{
-                { self.evaluations_commitments[NUM_POLY-1-i].checksig_verify_script() }
-                { self.evaluations_commitments[NUM_POLY-1-i].commit_u32_as_4bytes_script() }
+                { self.evaluations_commitments[NUM_POLY-1-i].commitments[0].checksig_verify_script() }
+                { self.evaluations_commitments[NUM_POLY-1-i].commitments[0].commit_u32_as_4bytes_script() }
             }
             OP_1
         };
@@ -145,9 +144,8 @@ mod test {
     use rand::Rng;
 
     use super::*;
-
-    use crate::{execute_script_with_inputs, BfField};
-    use crate::bit_comm::BitCommitment;
+    use crate::fri::field::BaseCanCommit;
+    use crate::{execute_script_with_inputs, BfBaseField, BitsCommitment};
 
     #[test]
     fn test_leaf_execution() {
@@ -167,10 +165,10 @@ mod test {
 
         let mut sigs: Vec<Vec<u8>> = Vec::new();
         for i in 0..num_polys {
-            let signature = leaf.evaluations_commitments[num_polys - 1 - i].signature();
+            let signature = leaf.evaluations_commitments[num_polys - 1 - i].commitments[0].signature();
             signature.iter().for_each(|item| sigs.push(item.to_vec()));
         }
-        let signature = leaf.x_commitment.signature();
+        let signature = leaf.x_commitment..commitments[0].signature();
         signature.iter().for_each(|item| sigs.push(item.to_vec()));
 
         println!("{:?}", script);
@@ -199,7 +197,7 @@ mod test {
         println!("{}", format!("{:X}", neg_x.as_u32()));
 
         // check signature and verify the value
-        let signature = leaf.x_commitment.signature();
+        let signature = leaf.x_commitment.commitments[0].signature();
         // check equal to r
         let exec_scripts = script! {
             { leaf.x_commitment.checksig_verify_script() }
@@ -210,7 +208,7 @@ mod test {
         assert!(exec_result.success);
 
         // check equal to -r
-        let signature = leaf.x_commitment.signature();
+        let signature = leaf.x_commitment.commitments[0].signature();
         let exec_scripts = script! {
             { leaf.x_commitment.checksig_verify_script() }
             { leaf.neg_x_commitment.check_equal_x_or_neg_x_script(&leaf.x_commitment) }
@@ -234,7 +232,7 @@ mod test {
             assert_eq!(x.as_u32(), leaf.x_commitment.origin_value);
             assert_eq!(neg_x.as_u32(), leaf.neg_x_commitment.origin_value);
             // check signature and verify the value
-            let signature = leaf.x_commitment.signature();
+            let signature = leaf.x_commitment.commitments[0].signature();
             // check equal to r
             let exec_scripts = script! {
                 { leaf.x_commitment.checksig_verify_script() }
@@ -245,7 +243,7 @@ mod test {
             assert!(exec_result.success);
 
             // check equal to -r
-            let signature = leaf.x_commitment.signature();
+            let signature = leaf.x_commitment.commitments[0].signature();
             let exec_scripts = script! {
                 { leaf.x_commitment.checksig_verify_script() }
                 { leaf.neg_x_commitment.check_equal_x_or_neg_x_script(&leaf.x_commitment) }
@@ -254,7 +252,7 @@ mod test {
             let exec_result = execute_script_with_inputs(exec_scripts, signature);
             assert!(exec_result.success);
 
-            let signature = leaf.neg_x_commitment.signature();
+            let signature = leaf.neg_x_commitment.commitments[0].signature();
             let exec_scripts = script! {
                 { leaf.neg_x_commitment.checksig_verify_script() }
                 { leaf.x_commitment.check_equal_x_or_neg_x_script(&leaf.neg_x_commitment) }
