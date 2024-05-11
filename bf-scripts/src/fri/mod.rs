@@ -5,6 +5,7 @@ pub use winternitz::*;
 pub mod field;
 pub use field::*;
 pub mod bit_comm;
+pub mod bit_comm_u32;
 pub mod point;
 pub use point::*;
 pub mod bc_assign;

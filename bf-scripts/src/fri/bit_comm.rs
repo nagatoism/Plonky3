@@ -1,89 +1,67 @@
-use std::marker::PhantomData;
-use std::ops::Deref;
-
-use bitcoin::opcodes::{OP_EQUAL, OP_EQUALVERIFY, OP_TOALTSTACK};
-use bitcoin::p2p::message;
+use bitcoin::opcodes::{OP_FROMALTSTACK, OP_TOALTSTACK};
 use bitcoin::ScriptBuf as Script;
 use bitcoin_script::{define_pushable, script};
 use itertools::Itertools;
-use p3_baby_bear::BabyBear;
+use p3_field::ExtensionField;
 
-use super::winternitz::*;
-use super::BfField;
-use crate::{u31ext_equalverify, winternitz};
-use crate::u32_std::u32_compress;
-
+use super::bit_comm_u32::*;
+use super::bit_comm_u32::BitCommitmentU32;
+use crate::fri::field::*;
+use crate::{u31ext_equalverify, BabyBear4};
 define_pushable!();
+// pub enum BitsCommitment<F: NativeField, EF: ExtensionField<F>>{
+//     Base(BitCommit<F>),
+//     Extension(BitCommitExtension<F,EF>),
+// }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct BitCommitment<F> {
-    pub value: F,
-    pub winternitz: Vec<Winternitz>,
-    pub message: Vec<u8>, // every u8 only available for 4-bits
+// pub fn new_bit_commit<F: BfBaseField, EF: BfExtensionField<F>>(secret: &str, value: impl Into<F> + Into<EF>) -> impl BitsCommitment{
+//     if let Some(value) = value.into().try_into() {
+//         BitCommit::<F>::new(secret, value)
+//     }
+
+//     BitCommit::<F>::new(secret, value)
+// }
+
+
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct BitCommitment<F:BfField> {
+    pub value:F,
+    pub commitments: Vec<BitCommitmentU32>,
+    
 }
 
-
-impl<F: BfField> BitCommitment<F> {
-    pub fn new(secret_key: &str, value: F) -> Self {
-       
-        let winternitz = vec![Winternitz::new(&secret_key);F::U32_SIZE];
-        
-        let message = value.as_u32_vec().iter().map(|elem| {
-            to_digits(*elem, winternitz::N)
-        }).flatten().collect_vec();
-        
-        Self {
+impl<F:BfField>  BitCommitment<F> {
+    pub fn new(secret_key: &str,value:F)->Self{
+        let u32_values = value.as_u32_vec();
+        let commitments = u32_values.iter().map(|v|{
+            BitCommitmentU32::new(secret_key, *v)
+        }).collect_vec();
+        Self{
             value,
-            winternitz,
-            message,
+            commitments,
         }
     }
 
-    pub fn commit_u32_as_4bytes(&self) -> Vec<u8> {
-        let message = self.message.clone();
-        let mut commit_message = vec![0u8; winternitz::N0 / 2];
-        for i in 0..winternitz::N0 / 2 {
-            let index = winternitz::N0 / 2 - 1 - i;
-            commit_message[i] = message[2 * index] ^ (message[2 * index + 1] << 4);
-        }
-        commit_message
-    }
-
-    pub fn commit_u32_as_4bytes_script(&self) -> Script {
-        let commit_message = self.commit_u32_as_4bytes();
+    pub fn message_TOALTSTACK(&self) -> Script {
         script! {
-            for i in 0..winternitz::N0/2{
-                {commit_message[ winternitz::N0 / 2 - 1 - i]} OP_EQUALVERIFY
+            for _ in 0..F::U32_SIZE{
+                OP_TOALTSTACK
             }
         }
     }
 
-    pub fn check_equal_x_or_neg_x_script(&self, neg_x: &BitCommitment<F>) -> Script {
+    pub fn message_FROMALTSTACK(&self) -> Script {
         script! {
-            for i in 0..winternitz::N0/2{
-                OP_DUP
-                {self.commit_u32_as_4bytes()[ winternitz::N0 / 2 - 1 - i]} OP_EQUAL OP_SWAP
-                {neg_x.commit_u32_as_4bytes()[ winternitz::N0 / 2 - 1 - i]} OP_EQUAL OP_ADD
-                OP_1 OP_EQUALVERIFY
+            for _ in 0..F::U32_SIZE{
+                OP_FROMALTSTACK
             }
         }
-    }
-
-    pub fn checksig_verify_script(&self) -> Script {
-        script! {
-            {self.winternitz[0].checksig_verify(self.winternitz[0].pub_key().as_slice())}
-        }
-    }
-
-    pub fn signature_script(&self) -> Script {
-        self.winter.sign_script(&self.message)
     }
 }
 
-impl<F: BfField>  BitCommitment<F> {
-  
-
-    pub fn from_message_at_stack(&self) -> Script {
+impl <F:BfField>BitCommitment<F> {
+    fn recover_message_at_stack(&self) -> Script {
         // we must confirm the stack state look like below after the inputs enter to match the complete_script:
         // bit_commits[0].sig  <- top
         // bit_commits[1].sig
@@ -91,15 +69,15 @@ impl<F: BfField>  BitCommitment<F> {
         // bit_commits[N].sig
         let script = script! {
             for i in 0..(F::U32_SIZE-1){
-                {self.bit_commits[i].recover_message_euqal_to_commit_message()}
-                {self.bit_commits[i].origin_value}
+                {self.commitments[i].recover_message_euqal_to_commit_message()}
+                {self.commitments[i].value}
                 OP_TOALTSTACK
             }
 
-            {self.bit_commits[F::U32_SIZE-1].recover_message_euqal_to_commit_message()}
-            {self.bit_commits[F::U32_SIZE-1].origin_value}
+            {self.commitments[F::U32_SIZE-1].recover_message_euqal_to_commit_message()}
+            {self.commitments[F::U32_SIZE-1].value}
 
-            for _ in 0..F::D-1{
+            for _ in 0..F::U32_SIZE{
                 OP_FROMALTSTACK
             }
             // The stake state looks like below:
@@ -111,16 +89,16 @@ impl<F: BfField>  BitCommitment<F> {
         script
     }
 
-    pub fn from_message_at_altstack(&self) -> Script {
+    fn recover_message_at_altstack(&self) -> Script {
         // we must confirm the stack state look like below after the inputs enter to match the recover_message_at_altstack:
         // bit_commits[0].sig  <- top
         // bit_commits[1].sig
         //       ...
         // bit_commits[N].sig
         let script = script! {
-            for i in 0..F::D{
-                {self.bit_commits[i].recover_message_euqal_to_commit_message()}
-                {self.bit_commits[i].origin_value}
+            for i in 0..F::U32_SIZE{
+                {self.commitments[i].recover_message_euqal_to_commit_message()}
+                {self.commitments[i].value}
                 OP_TOALTSTACK
             }
 
@@ -134,122 +112,36 @@ impl<F: BfField>  BitCommitment<F> {
     }
 
     // signuture is the input of this script
-    pub fn from_message_euqal_to_commit_message(&self) -> Script {
-        let ms = self.commit_message.as_base_slice();
+    fn recover_message_euqal_to_commit_message(&self) -> Script {
+        let u32_values  = self.value.as_u32_vec();
         script! {
             {self.recover_message_at_stack()}
-            { ms[3].as_u32() } { ms[2].as_u32() } { ms[1].as_u32() } { ms[0].as_u32() }
-            { u31ext_equalverify::<BabyBear,4>() }
+            { u32_values[3] } { u32_values[2]} { u32_values[1] } { u32_values[0]}
+            { u31ext_equalverify::<BabyBear4>() }
         }
     }
 
-    pub fn signature(&self) -> Vec<Vec<u8>> {
+    fn signature(&self) -> Vec<Vec<u8>> {
         let mut sigs = Vec::new();
-        for i in (0..F::D).rev() {
-            sigs.append(&mut self.bit_commits[i].signature());
+        for i in (0..F::U32_SIZE).rev() {
+            sigs.append(&mut self.commitments[i].signature());
         }
         sigs
     }
 }
+
 #[cfg(test)]
 mod test {
-    use p3_baby_bear::BabyBear;
-    use rand::Rng;
-
-    use super::*;
-    use crate::execute_script_with_inputs;
-
-    #[test]
-    fn test_bit_commit_with_compressu32() {
-        let value = BabyBear::from_u32(0x11654321);
-        let x_commitment = BitCommitment::new("0000", value);
-
-        let signature = x_commitment.signature();
-        // let exec_scripts = script! {
-        //     { x_commitment.checksig_verify_script() }
-        //     { u32_compress() }
-        //     { value.as_u32() }
-        //     OP_EQUAL
-        // };
-
-        let exec_scripts = script! {
-            { x_commitment.recover_message_euqal_to_commit_message() }
-            OP_1
-        };
-
-        // let exec_scripts = x_commitment.complete_script()
-
-        let exec_result = execute_script_with_inputs(exec_scripts, signature);
-        assert!(exec_result.success);
-    }
-
-    #[test]
-    fn test_bit_commmit_sig_and_verify() {
-        let x_commitment = BitCommitment::new("0000", BabyBear::from_u32(0x11654321));
-        assert_eq!(
-            x_commitment.commit_u32_as_4bytes(),
-            [0x11, 0x65, 0x43, 0x21]
-        );
-        // println!("{:?}",x_commitment.commit_message);
-
-        let check_equal_script = x_commitment.commit_u32_as_4bytes_script();
-        // println!("{:?}", check_equal_script);
-
-        let expect_script = script! {
-            0x21 OP_EQUALVERIFY // low position
-            0x43 OP_EQUALVERIFY
-            0x65 OP_EQUALVERIFY
-            0x11 OP_EQUALVERIFY // high position
-        };
-        // println!("{:}",expect_script);
-        assert_eq!(expect_script, check_equal_script);
-
-        // check signature and verify the value
-        let signature = x_commitment.signature();
-        let exec_scripts = script! {
-            { x_commitment.checksig_verify_script() }
-            { x_commitment.commit_u32_as_4bytes_script() }
-            OP_1
-        };
-        // println!("{:?}", exec_scripts);
-        let exec_result = execute_script_with_inputs(exec_scripts, signature);
-        assert!(exec_result.success);
-
-        for _ in 0..30 {
-            let mut rng = rand::thread_rng();
-            let random_number: u32 = rng.gen();
-            let n = random_number % BabyBear::MOD;
-
-            let x_commitment = BitCommitment::new(
-                "b138982ce17ac813d505b5b40b665d404e9528e8",
-                BabyBear::from_u32(n),
-            );
-            println!("{:?}", x_commitment.commit_u32_as_4bytes());
-
-            let check_equal_script = x_commitment.commit_u32_as_4bytes_script();
-            println!("{:?}", check_equal_script);
-
-            // check signature and verify the value
-            let signature = x_commitment.signature();
-            let exec_scripts = script! {
-                { x_commitment.checksig_verify_script() }
-                { x_commitment.commit_u32_as_4bytes_script() }
-                OP_1
-            };
-            let exec_result = execute_script_with_inputs(exec_scripts, signature);
-            assert!(exec_result.success);
-        }
-    }
 
     use core::ops::{Add, Mul, Neg};
 
     use p3_field::{AbstractExtensionField, AbstractField, PrimeField32};
-    use rand::{SeedableRng};
+    use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
 
     use super::*;
     use crate::{
-        execute_script, u31ext_add, u31ext_double, u31ext_equalverify,
+        execute_script, execute_script_with_inputs, u31ext_add, u31ext_double, u31ext_equalverify,
         BabyBear4,
     };
 
@@ -264,9 +156,9 @@ mod test {
         let a = rng.gen::<EF>();
         let b = rng.gen::<EF>();
         let a_commit =
-            BitCommitment::<EF>::new("b138982ce17ac813d505b5b40b665d404e9528e7", a);
+            BitCommitExtension::<F, EF>::new("b138982ce17ac813d505b5b40b665d404e9528e7", a);
         let b_commit =
-            BitCommitment::<EF>::new("b138982ce17ac813d505b5b40b665d404e9528e6", b);
+            BitCommitExtension::<F, EF>::new("b138982ce17ac813d505b5b40b665d404e9528e6", b);
 
         let c = a.add(b);
 
@@ -308,7 +200,7 @@ mod test {
         let a = rng.gen::<EF>();
 
         let a_commit =
-            BitCommitment::<EF>::new("b138982ce17ac813d505b5b40b665d404e9528e7", a);
+            BitCommitExtension::<F, EF>::new("b138982ce17ac813d505b5b40b665d404e9528e7", a);
 
         let a: &[F] = a.as_base_slice();
         let script = script! {
