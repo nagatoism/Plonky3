@@ -15,12 +15,13 @@ use core::iter::{Product, Sum};
 use core::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub, SubAssign};
 
 pub use mds::*;
+use num_bigint::BigUint;
 use p3_field::{
     exp_10540996611094048183, exp_u64_by_squaring, halve_u64, AbstractField, Field, Packable,
     PrimeField, PrimeField64, TwoAdicField,
 };
 use p3_util::{assume, branch_hint};
-pub use poseidon2::DiffusionMatrixGoldilocks;
+pub use poseidon2::*;
 use rand::distributions::{Distribution, Standard};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -224,9 +225,18 @@ impl Field for Goldilocks {
     fn halve(&self) -> Self {
         Goldilocks::new(halve_u64::<P>(self.value))
     }
+
+    #[inline]
+    fn order() -> BigUint {
+        P.into()
+    }
 }
 
-impl PrimeField for Goldilocks {}
+impl PrimeField for Goldilocks {
+    fn as_canonical_biguint(&self) -> BigUint {
+        <Self as PrimeField64>::as_canonical_u64(self).into()
+    }
+}
 
 impl PrimeField64 for Goldilocks {
     const ORDER_U64: u64 = P;
@@ -286,7 +296,7 @@ impl Sum for Goldilocks {
         // This is faster than iter.reduce(|x, y| x + y).unwrap_or(Self::zero()) for iterators of length > 2.
 
         // This sum will not overflow so long as iter.len() < 2^64.
-        let sum = iter.map(|x| (x.value as u128)).sum::<u128>();
+        let sum = iter.map(|x| x.value as u128).sum::<u128>();
         reduce128(sum)
     }
 }
@@ -382,7 +392,7 @@ pub(crate) fn reduce128(x: u128) -> Goldilocks {
 
 #[inline]
 #[allow(clippy::cast_possible_truncation)]
-fn split(x: u128) -> (u64, u64) {
+const fn split(x: u128) -> (u64, u64) {
     (x as u64, (x >> 64) as u64)
 }
 

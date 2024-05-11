@@ -14,13 +14,14 @@ use p3_symmetric::Permutation;
 
 use crate::{reduce128, Goldilocks};
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct MdsMatrixGoldilocks;
 
 /// Instantiate convolution for "small" RHS vectors over Goldilocks.
 ///
 /// Here "small" means N = len(rhs) <= 16 and sum(r for r in rhs) <
 /// 2^51, though in practice the sum will be less than 2^9.
+#[derive(Debug)]
 pub struct SmallConvolveGoldilocks;
 impl Convolve<Goldilocks, i128, i64, i128> for SmallConvolveGoldilocks {
     /// Return the lift of a Goldilocks element, 0 <= input.value <= P
@@ -60,7 +61,7 @@ impl Convolve<Goldilocks, i128, i64, i128> for SmallConvolveGoldilocks {
 
 const FFT_ALGO: Radix2Bowers = Radix2Bowers;
 
-const MATRIX_CIRC_MDS_8_SML_ROW: [i64; 8] = [4, 1, 2, 9, 10, 5, 1, 1];
+const MATRIX_CIRC_MDS_8_SML_ROW: [i64; 8] = [7, 1, 3, 8, 8, 3, 4, 9];
 
 impl Permutation<[Goldilocks; 8]> for MdsMatrixGoldilocks {
     fn permute(&self, input: [Goldilocks; 8]) -> [Goldilocks; 8] {
@@ -251,14 +252,14 @@ mod tests {
         let output = MdsMatrixGoldilocks.permute(input);
 
         let expected: [Goldilocks; 8] = [
-            7296579203883891650,
-            15846818354170800942,
-            2722920531482623643,
-            9616208848921711631,
-            490813044365975970,
-            5031976952389823366,
-            7947699737923523585,
-            12198158979238091825,
+            16726687146516531007,
+            14721040752765534861,
+            15566838577475948790,
+            9095485010737904250,
+            11353934351835864222,
+            11056556168691087893,
+            4199602889124860181,
+            315643510993921470,
         ]
         .map(Goldilocks::from_canonical_u64);
 

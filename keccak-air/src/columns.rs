@@ -13,8 +13,9 @@ use crate::{NUM_ROUNDS, RATE_LIMBS, U64_LIMBS};
 /// Thus, for example, `a_prime` is stored in `y, x, z` order. This departs from the more common
 /// convention of `x, y, z` order, but it has the benefit that input lists map to AIR columns in a
 /// nicer way.
+#[derive(Debug)]
 #[repr(C)]
-pub(crate) struct KeccakCols<T> {
+pub struct KeccakCols<T> {
     /// The `i`th value is set to 1 if we are in the `i`th round, otherwise 0.
     pub step_flags: [T; NUM_ROUNDS],
 
@@ -25,9 +26,6 @@ pub(crate) struct KeccakCols<T> {
 
     /// Permutation inputs, stored in y-major order.
     pub preimage: [[[T; U64_LIMBS]; 5]; 5],
-
-    /// Permutation outputs, stored in y-major order.
-    pub postimage: [[[T; U64_LIMBS]; 5]; 5],
 
     pub a: [[[T; U64_LIMBS]; 5]; 5],
 
@@ -80,12 +78,12 @@ impl<T: Copy> KeccakCols<T> {
         self.a_prime[b][a][(z + 64 - rot) % 64]
     }
 
-    pub fn a_prime_prime_prime(&self, x: usize, y: usize, limb: usize) -> T {
-        debug_assert!(x < 5);
+    pub fn a_prime_prime_prime(&self, y: usize, x: usize, limb: usize) -> T {
         debug_assert!(y < 5);
+        debug_assert!(x < 5);
         debug_assert!(limb < U64_LIMBS);
 
-        if x == 0 && y == 0 {
+        if y == 0 && x == 0 {
             self.a_prime_prime_prime_0_0_limbs[limb]
         } else {
             self.a_prime_prime[y][x][limb]
@@ -116,10 +114,10 @@ pub fn output_limb(i: usize) -> usize {
     let y = i_u64 / 5;
     let x = i_u64 % 5;
 
-    KECCAK_COL_MAP.postimage[y][x][limb_index]
+    KECCAK_COL_MAP.a_prime_prime_prime(y, x, limb_index)
 }
 
-pub(crate) const NUM_KECCAK_COLS: usize = size_of::<KeccakCols<u8>>();
+pub const NUM_KECCAK_COLS: usize = size_of::<KeccakCols<u8>>();
 pub(crate) const KECCAK_COL_MAP: KeccakCols<usize> = make_col_map();
 
 const fn make_col_map() -> KeccakCols<usize> {

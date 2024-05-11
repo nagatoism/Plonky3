@@ -4,6 +4,7 @@
 
 extern crate alloc;
 
+use alloc::vec::Vec;
 use core::hint::unreachable_unchecked;
 
 pub mod array_serialization;
@@ -17,7 +18,7 @@ pub const fn ceil_div_usize(a: usize, b: usize) -> usize {
 
 /// Computes `ceil(log_2(n))`.
 #[must_use]
-pub fn log2_ceil_usize(n: usize) -> usize {
+pub const fn log2_ceil_usize(n: usize) -> usize {
     (usize::BITS - n.saturating_sub(1).leading_zeros()) as usize
 }
 
@@ -139,4 +140,18 @@ impl<T> VecExt<T> for alloc::vec::Vec<T> {
         self.push(elem);
         self.last_mut().unwrap()
     }
+}
+
+pub fn transpose_vec<T>(v: Vec<Vec<T>>) -> Vec<Vec<T>> {
+    assert!(!v.is_empty());
+    let len = v[0].len();
+    let mut iters: Vec<_> = v.into_iter().map(|n| n.into_iter()).collect();
+    (0..len)
+        .map(|_| {
+            iters
+                .iter_mut()
+                .map(|n| n.next().unwrap())
+                .collect::<Vec<T>>()
+        })
+        .collect()
 }

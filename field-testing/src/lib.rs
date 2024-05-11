@@ -7,6 +7,8 @@ extern crate alloc;
 pub mod bench_func;
 
 pub use bench_func::*;
+use num_bigint::BigUint;
+use num_traits::identities::One;
 use p3_field::{
     cyclic_subgroup_coset_known_order, cyclic_subgroup_known_order, two_adic_coset_zerofier,
     two_adic_subgroup_zerofier, ExtensionField, Field, TwoAdicField,
@@ -75,6 +77,14 @@ where
     }
 }
 
+pub fn test_multiplicative_group_factors<F: Field>() {
+    let product: BigUint = F::multiplicative_group_factors()
+        .into_iter()
+        .map(|(factor, exponent)| factor.pow(exponent as u32))
+        .product();
+    assert_eq!(product + BigUint::one(), F::order());
+}
+
 pub fn test_two_adic_subgroup_zerofier<F: TwoAdicField>() {
     for log_n in 0..5 {
         let g = F::two_adic_generator(log_n);
@@ -130,6 +140,10 @@ macro_rules! test_field {
             fn test_inverse() {
                 $crate::test_inverse::<$field>();
             }
+            #[test]
+            fn test_multiplicative_group_factors() {
+                $crate::test_multiplicative_group_factors::<$field>();
+            }
         }
     };
 }
@@ -179,7 +193,7 @@ mod tests {
     use p3_baby_bear::BabyBear;
     use p3_field::extension::{BinomialExtensionField, HasFrobenius};
     use p3_field::{binomial_expand, eval_poly, AbstractExtensionField, AbstractField};
-    use rand::thread_rng;
+    use rand::random;
 
     use super::*;
 
@@ -188,7 +202,7 @@ mod tests {
         type F = BabyBear;
         type EF = BinomialExtensionField<F, 4>;
         for _ in 0..1024 {
-            let x: EF = thread_rng().gen();
+            let x: EF = random();
             let m: Vec<EF> = x.minimal_poly().into_iter().map(EF::from_base).collect();
             assert!(eval_poly(&m, x).is_zero());
         }

@@ -14,7 +14,7 @@ use p3_symmetric::Permutation;
 
 use crate::BabyBear;
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct MdsMatrixBabyBear;
 
 /// Instantiate convolution for "small" RHS vectors over BabyBear.
@@ -68,7 +68,7 @@ impl Convolve<BabyBear, i64, i64, i64> for SmallConvolveBabyBear {
 /// x' = x mod 2^10
 /// See Thm 1 (Below function) for a proof that this function is correct.
 #[inline(always)]
-fn barret_red_babybear(input: i128) -> i64 {
+const fn barret_red_babybear(input: i128) -> i64 {
     const N: usize = 40; // beta = 2^N, fixing N = 40 here
     const P: i128 = BabyBear::ORDER_U32 as i128;
     const I: i64 = (((1_i128) << (2 * N)) / P) as i64; // I = 2^80 / P => I < 2**50
@@ -105,7 +105,7 @@ fn barret_red_babybear(input: i128) -> i64 {
 //
 // It remains to prove that |x'| < 2**50.
 //
-// We start by introducing some simple inequalities and relations bewteen our variables:
+// We start by introducing some simple inequalities and relations between our variables:
 //
 // First consider the relationship between bitshift and division.
 // It's easy to check that for all x:
@@ -124,7 +124,7 @@ fn barret_red_babybear(input: i128) -> i64 {
 //
 // Finally, note that by definition:
 // input = input_high*(2**N) + input_low
-// Hence a simple rearrangment gets us
+// Hence a simple rearrangement gets us
 // 4: input_high*(2**N) = input - input_low
 //
 //
@@ -260,7 +260,7 @@ impl Convolve<BabyBear, i64, i64, i64> for LargeConvolveBabyBear {
     }
 }
 
-const MATRIX_CIRC_MDS_8_SML_ROW: [i64; 8] = [4, 1, 2, 9, 10, 5, 1, 1];
+const MATRIX_CIRC_MDS_8_SML_ROW: [i64; 8] = [7, 1, 3, 8, 8, 3, 4, 9];
 
 impl Permutation<[BabyBear; 8]> for MdsMatrixBabyBear {
     fn permute(&self, input: [BabyBear; 8]) -> [BabyBear; 8] {
@@ -431,8 +431,8 @@ mod tests {
         let output = MdsMatrixBabyBear.permute(input);
 
         let expected: [BabyBear; 8] = [
-            504128309, 1915631392, 1485872679, 1192473153, 1425656962, 634837116, 1385055496,
-            795071948,
+            1752937716, 1801468855, 1102954394, 284747746, 1636355768, 205443234, 1235359747,
+            1159982032,
         ]
         .map(BabyBear::from_canonical_u64);
 
