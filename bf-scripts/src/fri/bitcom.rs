@@ -1,12 +1,9 @@
 use std::marker::PhantomData;
-use std::ops::Deref;
 
-use bitcoin::opcodes::{OP_EQUAL, OP_EQUALVERIFY, OP_TOALTSTACK};
 use bitcoin::ScriptBuf as Script;
 use bitcoin_script::{define_pushable, script};
 
 use super::winternitz::*;
-use super::BfField;
 use crate::u32_std::u32_compress;
 use crate::{BfBaseField, BitsCommitment};
 define_pushable!();
@@ -114,7 +111,7 @@ mod test {
     use rand::Rng;
 
     use super::*;
-    use crate::execute_script_with_inputs;
+    use crate::{execute_script_with_inputs, BfField};
 
     #[test]
     fn test_bit_commit_with_compressu32() {

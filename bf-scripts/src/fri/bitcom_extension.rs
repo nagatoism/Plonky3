@@ -1,24 +1,10 @@
-use bitcoin::opcodes::{OP_FROMALTSTACK, OP_TOALTSTACK};
 use bitcoin::ScriptBuf as Script;
 use bitcoin_script::{define_pushable, script};
-use p3_field::ExtensionField;
 
 use super::bitcom::*;
 use crate::fri::field::*;
 use crate::{u31ext_equalverify, BabyBear4};
 define_pushable!();
-// pub enum BitsCommitment<F: NativeField, EF: ExtensionField<F>>{
-//     Base(BitCommit<F>),
-//     Extension(BitCommitExtension<F,EF>),
-// }
-
-// pub fn new_bit_commit<F: BfBaseField, EF: BfExtensionField<F>>(secret: &str, value: impl Into<F> + Into<EF>) -> impl BitsCommitment{
-//     if let Some(value) = value.into().try_into() {
-//         BitCommit::<F>::new(secret, value)
-//     }
-
-//     BitCommit::<F>::new(secret, value)
-// }
 
 pub enum BitsCommitmentEnum<F: BfBaseField, EF: BfExtensionField<F>> {
     Base(BitCommit<F>),

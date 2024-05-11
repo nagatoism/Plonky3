@@ -1,20 +1,16 @@
-use alloc::ffi::NulError;
 use alloc::vec::Vec;
-use p3_util::log2_strict_usize;
-use core::hash::Hash;
 use core::marker::PhantomData;
 use core::usize;
 
-use bf_scripts::{BfBaseField, BfExtensionField, BfField};
-use bitcoin::io::Error;
-use bitcoin::taproot::{LeafNode, NodeInfo, TaprootBuilderError, TaprootMerkleBranch};
-use bitcoin::{ScriptBuf, TapNodeHash};
+use bf_scripts::{BfBaseField, BfExtensionField};
+use bitcoin::TapNodeHash;
 use p3_commit::{DirectMmcs, ExtensionMatrix, Mmcs};
-use p3_matrix::dense::{RowMajorMatrix, RowMajorMatrixView};
-use p3_matrix::{Dimensions, Matrix, MatrixRowSlices};
+use p3_matrix::dense::RowMajorMatrix;
+use p3_matrix::{Dimensions, Matrix};
+use p3_util::log2_strict_usize;
 
 use super::error::BfError;
-use crate::prover::{DEFAULT_MATRIX_WIDTH};
+use crate::prover::DEFAULT_MATRIX_WIDTH;
 use crate::taptree::PolyCommitTree;
 use crate::BfCommitPhaseProofStep;
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
@@ -28,12 +24,8 @@ pub struct ExtensionTapTreeMmcs<
     _marker: PhantomData<(F, EF)>,
 }
 
-impl<
-        F: BfBaseField,
-        EF: BfExtensionField<F>,
-        const NUM_POLY: usize,
-        InnerMmcs,
-    > ExtensionTapTreeMmcs<F, EF, NUM_POLY, InnerMmcs>
+impl<F: BfBaseField, EF: BfExtensionField<F>, const NUM_POLY: usize, InnerMmcs>
+    ExtensionTapTreeMmcs<F, EF, NUM_POLY, InnerMmcs>
 {
     pub fn new(inner: InnerMmcs) -> Self {
         Self {
@@ -43,12 +35,8 @@ impl<
     }
 }
 
-impl<
-        F: BfBaseField,
-        EF: BfExtensionField<F>,
-        const NUM_POLY: usize,
-        InnerMmcs: Mmcs<F>,
-    > Mmcs<EF> for ExtensionTapTreeMmcs<F, EF, NUM_POLY, InnerMmcs>
+impl<F: BfBaseField, EF: BfExtensionField<F>, const NUM_POLY: usize, InnerMmcs: Mmcs<F>> Mmcs<EF>
+    for ExtensionTapTreeMmcs<F, EF, NUM_POLY, InnerMmcs>
 {
     type ProverData = PolyCommitTree<NUM_POLY>;
     type Proof = BfCommitPhaseProofStep;
@@ -64,11 +52,7 @@ impl<
         unimplemented!()
     }
 
-    fn open_taptree(
-        &self,
-        index: usize,
-        prover_data: &PolyCommitTree<NUM_POLY>,
-    ) -> Self::Proof {
+    fn open_taptree(&self, index: usize, prover_data: &PolyCommitTree<NUM_POLY>) -> Self::Proof {
         let opening_leaf = prover_data.get_leaf(index).unwrap().clone();
         let merkle_branch = opening_leaf.merkle_branch().clone();
         let leaf = opening_leaf.leaf().clone();
@@ -116,12 +100,8 @@ impl<
     }
 }
 
-impl<
-        F: BfBaseField,
-        EF: BfExtensionField<F>,
-        const NUM_POLY: usize,
-        InnerMmcs,
-    > DirectMmcs<EF> for ExtensionTapTreeMmcs<F, EF, NUM_POLY, InnerMmcs>
+impl<F: BfBaseField, EF: BfExtensionField<F>, const NUM_POLY: usize, InnerMmcs> DirectMmcs<EF>
+    for ExtensionTapTreeMmcs<F, EF, NUM_POLY, InnerMmcs>
 where
     InnerMmcs: Mmcs<F>,
 {

@@ -1,13 +1,8 @@
 use std::hash::Hash;
 
-use bitcoin::psbt::Output;
 pub use p3_baby_bear::BabyBear;
 use p3_field::extension::BinomialExtensionField;
-use p3_field::{
-    AbstractExtensionField, AbstractField, ExtensionField, PackedValue, PrimeField, PrimeField32,
-    TwoAdicField,
-};
-use rand::Rng;
+use p3_field::{AbstractExtensionField, AbstractField, ExtensionField, PrimeField32, TwoAdicField};
 pub trait BfField: AbstractField + TwoAdicField + Clone + Copy {
     // type AsU32Output;
     const BIS_SIZE: usize;
@@ -131,18 +126,3 @@ mod tests {
         assert_eq!(n, b_n.as_u32());
     }
 }
-
-// impl NativeField for u32{
-//     const BIS_SIZE:usize = 32;
-//     fn as_u32(&self) -> u32{
-//         return *self;
-//     }
-
-//     fn from_u32(data: u32) -> Self{
-//         return data;
-//     }
-
-//     fn group_genreator(group_size: u32) -> Self {
-//         return 1
-//     }
-// }

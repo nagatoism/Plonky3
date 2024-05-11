@@ -1,17 +1,13 @@
 use alloc::vec;
 use alloc::vec::Vec;
-use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
 use core::usize;
 
 use bf_scripts::{
-    execute_script, leaf, BfBaseField, BfExtensionField, BfField, EvaluationLeaf,
-    ExtensionPointsLeaf, PointsLeaf,
+    BfBaseField, BfExtensionField, BfField, EvaluationLeaf, ExtensionPointsLeaf, PointsLeaf,
 };
 use bitcoin::taproot::LeafVersion::TapScript;
-use bitcoin::taproot::{
-    LeafNode, LeafNodes, NodeInfo, TapTree, TaprootBuilderError, TaprootMerkleBranch,
-};
+use bitcoin::taproot::{LeafNode, LeafNodes, NodeInfo, TapTree, TaprootMerkleBranch};
 use bitcoin::{ScriptBuf, TapNodeHash};
 use p3_util::{log2_strict_usize, reverse_slice_index_bits};
 
@@ -33,32 +29,19 @@ pub fn construct_evaluation_leaf_script<const NUM_POLY: usize, F: BfBaseField>(
     Ok(script)
 }
 
-trait TreeProgram {
-    fn into_taptree() -> TapTree;
-}
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub struct GlobalTree {}
 
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-pub struct LayerTree {}
-
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-pub struct FSTree {}
-
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
-pub struct FoldingTree<const NUM_POLY: usize>(
-    pub BasicTree<NUM_POLY>,
-);
+pub struct FoldingTree<const NUM_POLY: usize>(pub BasicTree<NUM_POLY>);
 
 impl<const NUM_POLY: usize> FoldingTree<NUM_POLY> {
-    fn new(log_poly_points: usize,) -> Self {
+    fn new(log_poly_points: usize) -> Self {
         Self(BasicTree::new(log_poly_points))
     }
 }
 
-impl<const NUM_POLY: usize> Deref
-    for FoldingTree<NUM_POLY>
-{
+impl<const NUM_POLY: usize> Deref for FoldingTree<NUM_POLY> {
     type Target = BasicTree<NUM_POLY>;
 
     fn deref(&self) -> &Self::Target {
@@ -71,8 +54,7 @@ impl<const NUM_POLY: usize> Deref
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct PolyCommitTree<const NUM_POLY: usize>(pub BasicTree<NUM_POLY>);
 
-impl<const NUM_POLY: usize> PolyCommitTree<NUM_POLY>
-{
+impl<const NUM_POLY: usize> PolyCommitTree<NUM_POLY> {
     pub fn new(log_poly_points: usize) -> Self {
         Self(BasicTree::new(log_poly_points))
     }
@@ -149,9 +131,7 @@ impl<const NUM_POLY: usize> PolyCommitTree<NUM_POLY>
     }
 }
 
-impl<const NUM_POLY: usize> Deref
-    for PolyCommitTree<NUM_POLY>
-{
+impl<const NUM_POLY: usize> Deref for PolyCommitTree<NUM_POLY> {
     type Target = BasicTree<NUM_POLY>;
 
     fn deref(&self) -> &Self::Target {
@@ -159,9 +139,7 @@ impl<const NUM_POLY: usize> Deref
     }
 }
 
-impl<const NUM_POLY: usize> DerefMut
-    for PolyCommitTree<NUM_POLY>
-{
+impl<const NUM_POLY: usize> DerefMut for PolyCommitTree<NUM_POLY> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
@@ -174,7 +152,7 @@ pub struct BasicTree<const NUM_POLY: usize> {
 }
 
 impl<const NUM_POLY: usize> BasicTree<NUM_POLY> {
-    pub fn new(log_poly_points: usize,) -> Self {
+    pub fn new(log_poly_points: usize) -> Self {
         Self {
             root_node: None,
             tree_builder: Some(TreeBuilder::new(log_poly_points)),
@@ -257,9 +235,7 @@ impl<const NUM_POLY: usize> BasicTree<NUM_POLY> {
     }
 }
 
-impl<const NUM_POLY: usize> From<NodeInfo>
-    for BasicTree<NUM_POLY>
-{
+impl<const NUM_POLY: usize> From<NodeInfo> for BasicTree<NUM_POLY> {
     fn from(value: NodeInfo) -> Self {
         Self {
             root_node: Some(value),
@@ -275,13 +251,14 @@ pub struct TreeBuilder {
 }
 
 impl TreeBuilder {
-    pub fn new(log_n : usize) -> Self {
+    pub fn new(log_n: usize) -> Self {
         Self {
-            log_leaves:log_n,
-            leaves: Vec::new() }
+            log_leaves: log_n,
+            leaves: Vec::new(),
+        }
     }
 
-    pub fn log_leaves(&self) -> usize{
+    pub fn log_leaves(&self) -> usize {
         self.log_leaves
     }
 

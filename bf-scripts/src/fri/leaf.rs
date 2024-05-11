@@ -5,18 +5,13 @@
 // how to searlize the leaf
 // use which hash to hash the leaf script
 
-use std::marker::PhantomData;
 use std::usize;
 
-use bitcoin::hashes::{hash160, Hash};
-use bitcoin::opcodes::{OP_EQUAL, OP_EQUALVERIFY, OP_SWAP};
 use bitcoin::ScriptBuf as Script;
 use bitcoin_script::{define_pushable, script};
 
 use super::bitcom::*;
-use super::winternitz::*;
-use super::BfField;
-use crate::{fold_degree, BabyBearU31, BfBaseField, BitsCommitment};
+use crate::{fold_degree, BabyBearU31, BfBaseField};
 define_pushable!();
 
 pub struct VerifyFoldingLeaf<'a, const NUM_POLY: usize, F: BfBaseField> {
@@ -141,6 +136,7 @@ pub fn u8_to_hex_str(byte: &u8) -> String {
 #[cfg(test)]
 mod test {
     use p3_baby_bear::BabyBear;
+    use p3_field::AbstractField;
     use rand::Rng;
 
     use super::*;

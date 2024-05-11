@@ -86,6 +86,7 @@ impl SecretAssignment {
         SecretAssignment
     }
     fn get_secret(&self) -> &str {
+        // temporary secret
         "0000"
     }
 }
@@ -182,7 +183,8 @@ impl<F: BfBaseField> BCAssignment<F> {
 
 #[cfg(test)]
 mod tests {
-    use p3_field::{AbstractExtensionField, AbstractField, PrimeField32};
+    use p3_baby_bear::BabyBear;
+    use p3_field::AbstractField;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
 

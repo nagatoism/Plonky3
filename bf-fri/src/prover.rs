@@ -78,8 +78,7 @@ where
         commit_phase_openings,
     }
 }
-
-pub const BF_MATRIX_WIDTH: usize = 1;
+// Commit two adjacent points to a leaf node
 pub const DEFAULT_MATRIX_WIDTH: usize = 2;
 
 #[instrument(name = "commit phase", skip_all)]
@@ -99,7 +98,7 @@ where
     let mut commits = vec![];
     let mut data = vec![];
 
-    for log_folded_height in (config.log_blowup..log_max_height).rev() {
+    for _log_folded_height in (config.log_blowup..log_max_height).rev() {
         let leaves = RowMajorMatrix::new(current.clone(), DEFAULT_MATRIX_WIDTH);
         let (commit, prover_data) = config.mmcs.commit_matrix(leaves);
         challenger.observe(commit.clone());

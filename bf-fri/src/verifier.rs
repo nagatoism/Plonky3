@@ -1,19 +1,15 @@
 use alloc::vec;
 use alloc::vec::Vec;
 
-use bf_scripts::{execute_script, execute_script_with_inputs, BfField};
+use bf_scripts::execute_script;
 use bitcoin::taproot::TapLeaf;
-use bitcoin::Script;
 use itertools::izip;
 use p3_challenger::{CanObserve, CanSample, GrindingChallenger};
 use p3_commit::Mmcs;
 use p3_field::{Field, TwoAdicField};
-use p3_matrix::Dimensions;
 use p3_util::reverse_bits_len;
 
-use crate::{
-    get_leaf_index_by_query_index, BfCommitPhaseProofStep, BfQueryProof, FriConfig, FriProof,
-};
+use crate::{BfCommitPhaseProofStep, BfQueryProof, FriConfig, FriProof};
 
 #[derive(Debug)]
 pub enum FriError<CommitMmcsErr> {
@@ -68,7 +64,7 @@ where
         betas,
     })
 }
-struct OpeningData<F: TwoAdicField> {
+pub struct OpeningData<F: TwoAdicField> {
     leaf_index: usize,
     value: F,
     sibling_leaf_index: usize,

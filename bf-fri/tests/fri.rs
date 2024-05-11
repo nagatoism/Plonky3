@@ -1,12 +1,13 @@
-use bf_fri::{prover, verifier, FriConfig, TapTreeMmcs,ExtensionTapTreeMmcs};
+use bf_fri::{prover, verifier, ExtensionTapTreeMmcs, FriConfig, TapTreeMmcs};
 use itertools::Itertools;
 use p3_baby_bear::{BabyBear, DiffusionMatrixBabybear};
+use p3_blake3::Blake3;
 use p3_challenger::{CanSampleBits, DuplexChallenger, FieldChallenger};
 // use p3_commit::ExtensionMmcs;
-
 use p3_dft::{Radix2Dit, TwoAdicSubgroupDft};
 use p3_field::extension::BinomialExtensionField;
 use p3_field::{AbstractField, Field};
+use p3_keccak::KeccakF;
 use p3_matrix::dense::RowMajorMatrix;
 use p3_matrix::util::reverse_matrix_index_bits;
 use p3_matrix::{Matrix, MatrixRows};
@@ -16,24 +17,17 @@ use p3_symmetric::{PaddingFreeSponge, TruncatedPermutation};
 use p3_util::log2_strict_usize;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
-
 type Val = BabyBear;
-// type Challenge = BinomialExtensionField<Val, 4>;
-type Challenge = BabyBear;
+type ValMmcs = TapTreeMmcs<Val, 8>;
 
-type Perm = Poseidon2<Val, DiffusionMatrixBabybear, 16, 7>;
-type MyHash = PaddingFreeSponge<Perm, 16, 8, 8>;// 8r  , 8c
-type MyCompress = TruncatedPermutation<Perm, 2, 8, 16>;
-// type ValMmcs =
-//     FieldMerkleTreeMmcs<<Val as Field>::Packing, <Val as Field>::Packing, MyHash, MyCompress, 8>;
-type ValMmcs = TapTreeMmcs<<Val as Field>::Packing, <Val as Field>::Packing, 8>;
-// type ChallengeMmcs = ExtensionTapTreeMmcs<Val, Challenge, 1,ValMmcs>;
+type Challenge = u32;
+type Perm = KeccakF;
 
-type Challenger = DuplexChallenger<Val, Perm, 16>;
+type Challenger = DuplexChallenger<u64, Perm, 25>;
 type MyFriConfig = FriConfig<ValMmcs>;
 
 fn get_ldt_for_testing<R: Rng>(rng: &mut R) -> (Perm, MyFriConfig) {
-    let perm = Perm::new_from_rng(8, 22, DiffusionMatrixBabybear, rng);
+    let perm = Perm {};
 
     let mmcs = ValMmcs::new();
     let fri_config = FriConfig {

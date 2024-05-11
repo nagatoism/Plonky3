@@ -1,6 +1,4 @@
-use bitcoin::taproot::{
-    LeafNode, LeafNodes, NodeInfo, TapTree, TaprootBuilderError, TaprootMerkleBranch,
-};
+use bitcoin::taproot::TaprootBuilderError;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BfError {
