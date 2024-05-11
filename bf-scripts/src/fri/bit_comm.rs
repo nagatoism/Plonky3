@@ -1,9 +1,11 @@
 use bitcoin::opcodes::{OP_FROMALTSTACK, OP_TOALTSTACK};
 use bitcoin::ScriptBuf as Script;
 use bitcoin_script::{define_pushable, script};
+use itertools::Itertools;
 use p3_field::ExtensionField;
 
-use super::bitcom::*;
+use super::bit_comm_u32::*;
+use super::bit_comm_u32::BitCommitmentU32;
 use crate::fri::field::*;
 use crate::{u31ext_equalverify, BabyBear4};
 define_pushable!();
@@ -20,62 +22,30 @@ define_pushable!();
 //     BitCommit::<F>::new(secret, value)
 // }
 
-pub enum BitsCommitmentEnum<F: BfBaseField, EF: BfExtensionField<F>> {
-    Base(BitCommit<F>),
-    Extension(BitCommitExtension<F, EF>),
-}
 
-pub trait BitsCommitment {
-    fn recover_message_at_stack(&self) -> Script;
-    fn recover_message_at_altstack(&self) -> Script;
-    fn recover_message_euqal_to_commit_message(&self) -> Script;
-    fn signature(&self) -> Vec<Vec<u8>>;
-}
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct BitCommitExtension<F: BfBaseField, EF: BfExtensionField<F>> {
-    pub commit_message: EF,
-    pub bit_commits: Vec<BitCommit<F>>,
-    _marker: std::marker::PhantomData<EF>,
+pub struct BitCommitment<F:BfField> {
+    pub value:F,
+    pub commitments: Vec<BitCommitmentU32>,
+    
 }
 
-impl<F: BfBaseField, EF: BfExtensionField<F>> BitCommitExtension<F, EF> {
-    pub fn new_from_bit_commits(value: EF, bcs: Vec<&BitCommit<F>>) -> BitCommitExtension<F, EF> {
-        let mut bit_commits = Vec::new();
-        for i in 0..EF::D {
-            let bit_commit: BitCommit<F> = bcs[i].clone();
-            bit_commits.push(bit_commit);
-        }
-        Self {
-            commit_message: value,
-            bit_commits,
-            _marker: std::marker::PhantomData,
-        }
-    }
-
-    pub fn new_from_base_slice(secret: &str, bs: &[F]) -> Self {
-        let value = EF::from_base_slice(bs);
-        Self::new(secret, value)
-    }
-
-    pub fn new(secret: &str, value: EF) -> Self {
-        let mut bit_commits = Vec::new();
-        for i in 0..EF::D {
-            // let secret_i = format!("{}{}",secret,i);
-            let secret_i = secret;
-            let bit_commit = BitCommit::<F>::new(secret_i, value.as_base_slice()[i]);
-            bit_commits.push(bit_commit)
-        }
-        Self {
-            commit_message: value,
-            bit_commits,
-            _marker: std::marker::PhantomData,
+impl<F:BfField>  BitCommitment<F> {
+    pub fn new(secret_key: &str,value:F)->Self{
+        let u32_values = value.as_u32_vec();
+        let commitments = u32_values.iter().map(|v|{
+            BitCommitmentU32::new(secret_key, *v)
+        }).collect_vec();
+        Self{
+            value,
+            commitments,
         }
     }
 
     pub fn message_TOALTSTACK(&self) -> Script {
         script! {
-            for _ in 0..EF::D{
+            for _ in 0..F::U32_SIZE{
                 OP_TOALTSTACK
             }
         }
@@ -83,14 +53,14 @@ impl<F: BfBaseField, EF: BfExtensionField<F>> BitCommitExtension<F, EF> {
 
     pub fn message_FROMALTSTACK(&self) -> Script {
         script! {
-            for _ in 0..EF::D{
+            for _ in 0..F::U32_SIZE{
                 OP_FROMALTSTACK
             }
         }
     }
 }
 
-impl<F: BfBaseField, EF: BfExtensionField<F>> BitsCommitment for BitCommitExtension<F, EF> {
+impl <F:BfField>BitCommitment<F> {
     fn recover_message_at_stack(&self) -> Script {
         // we must confirm the stack state look like below after the inputs enter to match the complete_script:
         // bit_commits[0].sig  <- top
@@ -98,16 +68,16 @@ impl<F: BfBaseField, EF: BfExtensionField<F>> BitsCommitment for BitCommitExtens
         //       ...
         // bit_commits[N].sig
         let script = script! {
-            for i in 0..(EF::D-1){
-                {self.bit_commits[i].recover_message_euqal_to_commit_message()}
-                {self.bit_commits[i].origin_value}
+            for i in 0..(F::U32_SIZE-1){
+                {self.commitments[i].recover_message_euqal_to_commit_message()}
+                {self.commitments[i].value}
                 OP_TOALTSTACK
             }
 
-            {self.bit_commits[EF::D-1].recover_message_euqal_to_commit_message()}
-            {self.bit_commits[EF::D-1].origin_value}
+            {self.commitments[F::U32_SIZE-1].recover_message_euqal_to_commit_message()}
+            {self.commitments[F::U32_SIZE-1].value}
 
-            for _ in 0..EF::D-1{
+            for _ in 0..F::U32_SIZE{
                 OP_FROMALTSTACK
             }
             // The stake state looks like below:
@@ -126,9 +96,9 @@ impl<F: BfBaseField, EF: BfExtensionField<F>> BitsCommitment for BitCommitExtens
         //       ...
         // bit_commits[N].sig
         let script = script! {
-            for i in 0..EF::D{
-                {self.bit_commits[i].recover_message_euqal_to_commit_message()}
-                {self.bit_commits[i].origin_value}
+            for i in 0..F::U32_SIZE{
+                {self.commitments[i].recover_message_euqal_to_commit_message()}
+                {self.commitments[i].value}
                 OP_TOALTSTACK
             }
 
@@ -143,18 +113,18 @@ impl<F: BfBaseField, EF: BfExtensionField<F>> BitsCommitment for BitCommitExtens
 
     // signuture is the input of this script
     fn recover_message_euqal_to_commit_message(&self) -> Script {
-        let ms = self.commit_message.as_base_slice();
+        let u32_values  = self.value.as_u32_vec();
         script! {
             {self.recover_message_at_stack()}
-            { ms[3].as_u32() } { ms[2].as_u32() } { ms[1].as_u32() } { ms[0].as_u32() }
+            { u32_values[3] } { u32_values[2]} { u32_values[1] } { u32_values[0]}
             { u31ext_equalverify::<BabyBear4>() }
         }
     }
 
     fn signature(&self) -> Vec<Vec<u8>> {
         let mut sigs = Vec::new();
-        for i in (0..EF::D).rev() {
-            sigs.append(&mut self.bit_commits[i].signature());
+        for i in (0..F::U32_SIZE).rev() {
+            sigs.append(&mut self.commitments[i].signature());
         }
         sigs
     }

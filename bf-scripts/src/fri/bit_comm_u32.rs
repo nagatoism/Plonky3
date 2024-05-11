@@ -8,35 +8,33 @@ use bitcoin_script::{define_pushable, script};
 use super::winternitz::*;
 use super::BfField;
 use crate::u32_std::u32_compress;
-use crate::{BfBaseField, BitsCommitment};
+use crate::winternitz;
 define_pushable!();
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct BitCommit<F: BfBaseField> {
-    pub origin_value: u32,
-    pub winter: Winternitz<F>,
+pub (crate )struct BitCommitmentU32  {
+    pub value: u32,
+    pub winternitz: Winternitz,
     pub message: Vec<u8>, // every u8 only available for 4-bits
-    _marker: PhantomData<F>,
 }
 
-impl<F: BfBaseField> BitCommit<F> {
-    pub fn new(secret_key: &str, origin_value: F) -> Self {
-        let origin_value = origin_value.as_u32();
-        let winter = Winternitz::<F>::new(&secret_key);
-        let message = to_digits(origin_value, F::N0);
+impl BitCommitmentU32 {
+    pub fn new(secret_key: &str, value: u32) -> Self {
+        
+        let winternitz = Winternitz::new(&secret_key);
+        let message = to_digits(value, winternitz::N0);
         Self {
-            origin_value,
-            winter,
+            value,
+            winternitz,
             message,
-            _marker: PhantomData,
         }
     }
 
     pub fn commit_u32_as_4bytes(&self) -> Vec<u8> {
         let message = self.message.clone();
-        let mut commit_message = vec![0u8; F::N0 / 2];
-        for i in 0..F::N0 / 2 {
-            let index = F::N0 / 2 - 1 - i;
+        let mut commit_message = vec![0u8; winternitz::N0 / 2];
+        for i in 0..winternitz::N0 / 2 {
+            let index = winternitz::N0 / 2 - 1 - i;
             commit_message[i] = message[2 * index] ^ (message[2 * index + 1] << 4);
         }
         commit_message
@@ -45,18 +43,18 @@ impl<F: BfBaseField> BitCommit<F> {
     pub fn commit_u32_as_4bytes_script(&self) -> Script {
         let commit_message = self.commit_u32_as_4bytes();
         script! {
-            for i in 0..F::N0/2{
-                {commit_message[ F::N0 / 2 - 1 - i]} OP_EQUALVERIFY
+            for i in 0..winternitz::N0/2{
+                {commit_message[ winternitz::N0 / 2 - 1 - i]} OP_EQUALVERIFY
             }
         }
     }
 
-    pub fn check_equal_x_or_neg_x_script(&self, neg_x: &BitCommit<F>) -> Script {
+    pub fn check_equal_x_or_neg_x_script(&self, neg_x: &BitCommitmentU32) -> Script {
         script! {
-            for i in 0..F::N0/2{
+            for i in 0..winternitz::N0/2{
                 OP_DUP
-                {self.commit_u32_as_4bytes()[ F::N0 / 2 - 1 - i]} OP_EQUAL OP_SWAP
-                {neg_x.commit_u32_as_4bytes()[ F::N0 / 2 - 1 - i]} OP_EQUAL OP_ADD
+                {self.commit_u32_as_4bytes()[ winternitz::N0 / 2 - 1 - i]} OP_EQUAL OP_SWAP
+                {neg_x.commit_u32_as_4bytes()[ winternitz::N0 / 2 - 1 - i]} OP_EQUAL OP_ADD
                 OP_1 OP_EQUALVERIFY
             }
         }
@@ -64,24 +62,22 @@ impl<F: BfBaseField> BitCommit<F> {
 
     pub fn checksig_verify_script(&self) -> Script {
         script! {
-            {self.winter.checksig_verify(self.winter.pub_key().as_slice())}
+            {self.winternitz.checksig_verify_self_pubkey()}
         }
     }
 
     pub fn signature_script(&self) -> Script {
-        self.winter.sign_script(&self.message)
+        self.winternitz.sign_script(&self.message)
     }
-}
 
-impl<F: BfBaseField> BitsCommitment for BitCommit<F> {
-    fn recover_message_at_stack(&self) -> Script {
+    pub (crate) fn recover_message_at_stack(&self) -> Script {
         script! {
             {self.checksig_verify_script()}
             {u32_compress()}
         }
     }
 
-    fn recover_message_at_altstack(&self) -> Script {
+    pub  (crate)  fn recover_message_at_altstack(&self) -> Script {
         script! {
             {self.checksig_verify_script()}
             {u32_compress()}
@@ -90,16 +86,16 @@ impl<F: BfBaseField> BitsCommitment for BitCommit<F> {
     }
 
     // signuture is the input of this script
-    fn recover_message_euqal_to_commit_message(&self) -> Script {
+    pub  (crate) fn recover_message_euqal_to_commit_message(&self) -> Script {
         script! {
             {self.recover_message_at_stack()}
-            {self.origin_value }
+            {self.value }
             OP_EQUALVERIFY
         }
     }
 
-    fn signature(&self) -> Vec<Vec<u8>> {
-        let mut sig = self.winter.sign(&self.message);
+    pub (crate)fn signature(&self) -> Vec<Vec<u8>> {
+        let mut sig = self.winternitz.sign(&self.message);
         for i in 0..sig.len() {
             if sig[i].len() == 1 && sig[i][0] == 0 {
                 sig[i] = vec![]
