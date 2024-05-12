@@ -1,46 +1,27 @@
-use bitcoin::opcodes::{OP_FROMALTSTACK, OP_TOALTSTACK};
 use bitcoin::ScriptBuf as Script;
 use bitcoin_script::{define_pushable, script};
 use itertools::Itertools;
 use p3_field::ExtensionField;
 
-use super::bit_comm_u32::*;
-use super::bit_comm_u32::BitCommitmentU32;
+use super::bit_comm_u32::{BitCommitmentU32, *};
 use crate::fri::field::*;
 use crate::{u31ext_equalverify, BabyBear4};
 define_pushable!();
-// pub enum BitsCommitment<F: NativeField, EF: ExtensionField<F>>{
-//     Base(BitCommit<F>),
-//     Extension(BitCommitExtension<F,EF>),
-// }
-
-// pub fn new_bit_commit<F: BfBaseField, EF: BfExtensionField<F>>(secret: &str, value: impl Into<F> + Into<EF>) -> impl BitsCommitment{
-//     if let Some(value) = value.into().try_into() {
-//         BitCommit::<F>::new(secret, value)
-//     }
-
-//     BitCommit::<F>::new(secret, value)
-// }
-
-
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct BitCommitment<F:BfField> {
-    pub value:F,
+pub struct BitCommitment<F: BfField> {
+    pub value: F,
     pub commitments: Vec<BitCommitmentU32>,
-    
 }
 
-impl<F:BfField>  BitCommitment<F> {
-    pub fn new(secret_key: &str,value:F)->Self{
+impl<F: BfField> BitCommitment<F> {
+    pub fn new(secret_key: &str, value: F) -> Self {
         let u32_values = value.as_u32_vec();
-        let commitments = u32_values.iter().map(|v|{
-            BitCommitmentU32::new(secret_key, *v)
-        }).collect_vec();
-        Self{
-            value,
-            commitments,
-        }
+        let commitments = u32_values
+            .iter()
+            .map(|v| BitCommitmentU32::new(secret_key, *v))
+            .collect_vec();
+        Self { value, commitments }
     }
 
     pub fn message_TOALTSTACK(&self) -> Script {
@@ -60,7 +41,7 @@ impl<F:BfField>  BitCommitment<F> {
     }
 }
 
-impl <F:BfField>BitCommitment<F> {
+impl<F: BfField> BitCommitment<F> {
     fn recover_message_at_stack(&self) -> Script {
         // we must confirm the stack state look like below after the inputs enter to match the complete_script:
         // bit_commits[0].sig  <- top
@@ -113,7 +94,7 @@ impl <F:BfField>BitCommitment<F> {
 
     // signuture is the input of this script
     fn recover_message_euqal_to_commit_message(&self) -> Script {
-        let u32_values  = self.value.as_u32_vec();
+        let u32_values = self.value.as_u32_vec();
         script! {
             {self.recover_message_at_stack()}
             { u32_values[3] } { u32_values[2]} { u32_values[1] } { u32_values[0]}
@@ -155,10 +136,8 @@ mod test {
 
         let a = rng.gen::<EF>();
         let b = rng.gen::<EF>();
-        let a_commit =
-            BitCommitment::new("b138982ce17ac813d505b5b40b665d404e9528e7", a);
-        let b_commit =
-            BitCommitment::new("b138982ce17ac813d505b5b40b665d404e9528e6", b);
+        let a_commit = BitCommitment::new("b138982ce17ac813d505b5b40b665d404e9528e7", a);
+        let b_commit = BitCommitment::new("b138982ce17ac813d505b5b40b665d404e9528e6", b);
 
         let c = a.add(b);
 
@@ -199,8 +178,7 @@ mod test {
         let mut rng = ChaCha20Rng::seed_from_u64(0u64);
         let a = rng.gen::<EF>();
 
-        let a_commit =
-            BitCommitment::new("b138982ce17ac813d505b5b40b665d404e9528e7", a);
+        let a_commit = BitCommitment::new("b138982ce17ac813d505b5b40b665d404e9528e7", a);
 
         let a: &[F] = a.as_base_slice();
         let script = script! {

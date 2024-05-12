@@ -133,10 +133,14 @@ where
             let index_i_sibling = index_i ^ 1;
             let index_pair = index_i >> 1;
 
+            // opening_proof is the merklepath here
+            // opened_rows is the leaf of merkletree, so we need to check the open_rows-leaf component
+            // because the Matrix is the width 2 what means that two point combine into one leaf
             let (mut opened_rows, opening_proof) = config.mmcs.open_batch(index_pair, commit);
             assert_eq!(opened_rows.len(), 1);
             let opened_row = opened_rows.pop().unwrap();
             assert_eq!(opened_row.len(), 2, "Committed data should be in pairs");
+            // another point from the same leaf(row).
             let sibling_value = opened_row[index_i_sibling % 2];
 
             CommitPhaseProofStep {

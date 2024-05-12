@@ -489,6 +489,13 @@ mod tests {
                 base.exp_power_of_2(BabyBear::TWO_ADICITY - bits)
             );
         }
+
+        let bits = 2;
+        let generator = BabyBear::two_adic_generator(bits);
+        assert_eq!(
+            generator * generator * generator * generator,
+            BabyBear::one()
+        );
     }
 
     #[test]

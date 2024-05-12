@@ -11,8 +11,6 @@ mod proof;
 pub mod prover;
 // mod two_adic_pcs;
 pub mod error;
-pub mod extension_mmcs;
-pub mod taptree;
 pub mod verifier;
 
 pub use config::*;

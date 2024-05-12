@@ -21,7 +21,7 @@ use bitcoin::script::ScriptIntError;
 pub use bitcoin_script::{define_pushable, script};
 
 pub use crate::execute_script;
-use crate::{BfField};
+use crate::BfField;
 
 define_pushable!();
 use bitcoin::hashes::{hash160, Hash};
@@ -51,7 +51,6 @@ pub const N1_INS: usize = 2;
 /// Total number of digits to be signed
 pub const N_INS: usize = N0_INS + N1_INS;
 
-
 pub const N: usize = 10;
 pub const N0: usize = 8;
 pub const N1: usize = 2;
@@ -67,16 +66,14 @@ pub struct Winternitz {
 impl Winternitz {
     pub fn new(secret_key: &str) -> Self {
         let mut pubkey = Vec::new();
-        
-    
+
         for i in 0..N {
             pubkey.push(generate_public_key(&secret_key, i as u32));
         }
-    
+
         Self {
             secret_key: String::from(secret_key),
             pub_key: pubkey,
-          
         }
     }
 
@@ -267,9 +264,8 @@ impl Winternitz {
             }
 
         }
-   
     }
-    pub fn checksig_verify_self_pubkey(&self)->Script{
+    pub fn checksig_verify_self_pubkey(&self) -> Script {
         self.checksig_verify(&self.pub_key().as_slice())
     }
 }
@@ -328,7 +324,7 @@ mod test {
         // if the message is [1, 2, 3, 4, 5, 6, 7, 8]; checksum=36 120-36=84(0101,0100)[5,4]
         let sum = winter.checksum(&message_digits);
         assert_eq!(sum, 84);
-        let checksum_digits = to_digits(winter.checksum(&message_digits),N1).to_vec();
+        let checksum_digits = to_digits(winter.checksum(&message_digits), N1).to_vec();
         assert_eq!(checksum_digits, vec![4, 5]);
     }
 
@@ -367,7 +363,7 @@ mod test {
 
         // test zero case
         let origin_value: u32 = 0xED65002F;
-        let message = to_digits(origin_value,N0);
+        let message = to_digits(origin_value, N0);
         const MESSAGE_1: [u8; N0_INS as usize] = [0xF, 2, 0, 0, 5, 6, 0xD, 0xE];
         assert_eq!(message, MESSAGE_1);
 

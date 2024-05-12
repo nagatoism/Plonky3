@@ -4,12 +4,12 @@ use itertools::Itertools;
 use p3_baby_bear::BabyBear;
 use p3_field::extension::BinomialExtensionField;
 
-use crate::{bit_comm::BitCommitment, bit_comm_u32::BitCommitmentU32, BfField};
+use crate::bit_comm::BitCommitment;
+use crate::bit_comm_u32::BitCommitmentU32;
+use crate::BfField;
 // static BC_ASSIGN: Lazy<Mutex<BCAssignment<BabyBear>>> = Lazy::new(|| {
 //     Mutex::new(BCAssignment::<BabyBear>::new())
 // });
-
-
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct BCAssignment {
@@ -25,6 +25,7 @@ impl SecretAssignment {
         SecretAssignment
     }
     fn get_secret(&self) -> &str {
+        // temporary secret
         "0000"
     }
 }
@@ -42,40 +43,38 @@ impl BCAssignment {
         self.secret_assign.get_secret()
     }
 
-    pub fn force_insert(&mut self, value: u32,) -> BitCommitmentU32 {
+    pub fn force_insert(&mut self, value: u32) -> BitCommitmentU32 {
         let bc = BitCommitmentU32::new(self.get_secret(), value);
         self.bcs.insert(value, bc);
         self.get(value).unwrap()
     }
 
     pub fn get(&self, value: u32) -> Option<BitCommitmentU32> {
-        self.bcs.get(&value).map(|bc|bc.clone())
+        self.bcs.get(&value).map(|bc| bc.clone())
     }
-
-   
 
     pub fn assign(&mut self, value: u32) -> BitCommitmentU32 {
         let secret = self.secret_assign.get_secret();
         self.bcs
             .entry(value)
-            .or_insert_with(|| BitCommitmentU32::new(secret, value)).clone()
+            .or_insert_with(|| BitCommitmentU32::new(secret, value))
+            .clone()
     }
 
-    pub fn assign_field<F:BfField>(&mut self, value:F)->BitCommitment<F>{
-       let commitments = value.as_u32_vec().iter().map(|u32_value|{
-            self.assign(*u32_value)
-       }).collect_vec();
-       BitCommitment{ value, commitments }
-
-        
+    pub fn assign_field<F: BfField>(&mut self, value: F) -> BitCommitment<F> {
+        let commitments = value
+            .as_u32_vec()
+            .iter()
+            .map(|u32_value| self.assign(*u32_value))
+            .collect_vec();
+        BitCommitment { value, commitments }
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
-    use p3_field::{AbstractExtensionField, AbstractField, PrimeField32};
+    use p3_baby_bear::BabyBear;
+    use p3_field::AbstractField;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
 
@@ -86,8 +85,8 @@ mod tests {
     #[test]
     fn test_assign_bitcommits() {
         use super::*;
-        let key= 123;
-        let bc_assign: &mut BCAssignment= &mut BCAssignment::new();
+        let key = 123;
+        let bc_assign: &mut BCAssignment = &mut BCAssignment::new();
         let mut bc_temp: BitCommitmentU32 = BitCommitmentU32::new("1223", key);
         {
             bc_assign.force_insert(key);

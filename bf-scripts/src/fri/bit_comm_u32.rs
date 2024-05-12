@@ -1,18 +1,15 @@
 use std::marker::PhantomData;
-use std::ops::Deref;
 
-use bitcoin::opcodes::{OP_EQUAL, OP_EQUALVERIFY, OP_TOALTSTACK};
 use bitcoin::ScriptBuf as Script;
 use bitcoin_script::{define_pushable, script};
 
 use super::winternitz::*;
-use super::BfField;
 use crate::u32_std::u32_compress;
 use crate::winternitz;
 define_pushable!();
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub (crate )struct BitCommitmentU32  {
+pub(crate) struct BitCommitmentU32 {
     pub value: u32,
     pub winternitz: Winternitz,
     pub message: Vec<u8>, // every u8 only available for 4-bits
@@ -20,7 +17,6 @@ pub (crate )struct BitCommitmentU32  {
 
 impl BitCommitmentU32 {
     pub fn new(secret_key: &str, value: u32) -> Self {
-        
         let winternitz = Winternitz::new(&secret_key);
         let message = to_digits(value, winternitz::N0);
         Self {
@@ -70,14 +66,14 @@ impl BitCommitmentU32 {
         self.winternitz.sign_script(&self.message)
     }
 
-    pub (crate) fn recover_message_at_stack(&self) -> Script {
+    pub(crate) fn recover_message_at_stack(&self) -> Script {
         script! {
             {self.checksig_verify_script()}
             {u32_compress()}
         }
     }
 
-    pub  (crate)  fn recover_message_at_altstack(&self) -> Script {
+    pub(crate) fn recover_message_at_altstack(&self) -> Script {
         script! {
             {self.checksig_verify_script()}
             {u32_compress()}
@@ -86,7 +82,7 @@ impl BitCommitmentU32 {
     }
 
     // signuture is the input of this script
-    pub  (crate) fn recover_message_euqal_to_commit_message(&self) -> Script {
+    pub(crate) fn recover_message_euqal_to_commit_message(&self) -> Script {
         script! {
             {self.recover_message_at_stack()}
             {self.value }
@@ -94,7 +90,7 @@ impl BitCommitmentU32 {
         }
     }
 
-    pub (crate)fn signature(&self) -> Vec<Vec<u8>> {
+    pub(crate) fn signature(&self) -> Vec<Vec<u8>> {
         let mut sig = self.winternitz.sign(&self.message);
         for i in 0..sig.len() {
             if sig[i].len() == 1 && sig[i][0] == 0 {
@@ -110,7 +106,8 @@ mod test {
     use rand::Rng;
 
     use super::*;
-    use crate::{bit_comm::BitCommitment, execute_script_with_inputs};
+    use crate::bit_comm::BitCommitment;
+    use crate::execute_script_with_inputs;
 
     #[test]
     fn test_bit_commit_with_compressu32() {
@@ -118,19 +115,11 @@ mod test {
         let x_commitment = BitCommitmentU32::new("0000", value.as_u32_vec()[0]);
 
         let signature = x_commitment.signature();
-        // let exec_scripts = script! {
-        //     { x_commitment.checksig_verify_script() }
-        //     { u32_compress() }
-        //     { value.as_u32() }
-        //     OP_EQUAL
-        // };
 
         let exec_scripts = script! {
             { x_commitment.recover_message_euqal_to_commit_message() }
             OP_1
         };
-
-        // let exec_scripts = x_commitment.complete_script()
 
         let exec_result = execute_script_with_inputs(exec_scripts, signature);
         assert!(exec_result.success);
@@ -173,10 +162,7 @@ mod test {
             let random_number: u32 = rng.gen();
             let n = random_number % BabyBear::MOD;
 
-            let x_commitment = BitCommitmentU32::new(
-                "b138982ce17ac813d505b5b40b665d404e9528e8",
-                n
-            );
+            let x_commitment = BitCommitmentU32::new("b138982ce17ac813d505b5b40b665d404e9528e8", n);
             println!("{:?}", x_commitment.commit_u32_as_4bytes());
 
             let check_equal_script = x_commitment.commit_u32_as_4bytes_script();

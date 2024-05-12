@@ -31,6 +31,7 @@ where
     Challenger: GrindingChallenger + CanObserve<M::Commitment> + CanSample<F>,
     G: FriGenericConfig<F>,
 {
+    // generate betas
     let betas: Vec<F> = proof
         .commit_phase_commits
         .iter()
@@ -40,6 +41,7 @@ where
         })
         .collect();
 
+    // Check the number of QueryProof given by prover is equal to the config.num_queries
     if proof.query_proofs.len() != config.num_queries {
         return Err(FriError::InvalidProofShape);
     }

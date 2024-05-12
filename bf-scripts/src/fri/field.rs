@@ -1,6 +1,5 @@
 use std::hash::Hash;
 
-use bitcoin::psbt::Output;
 pub use p3_baby_bear::BabyBear;
 use p3_field::extension::BinomialExtensionField;
 use p3_field::{
@@ -9,12 +8,11 @@ use p3_field::{
 };
 use rand::Rng;
 
-
-pub trait BfField: AbstractField + TwoAdicField + Clone + Copy +{
+pub trait BfField: AbstractField + TwoAdicField + Clone + Copy {
     // type AsU32Output;
     const BIS_SIZE: usize;
     const MOD: u32;
-    const U32_SIZE:usize;
+    const U32_SIZE: usize;
 
     fn from_u32(data: u32) -> Self {
         Self::from_canonical_u32(data)
@@ -41,40 +39,36 @@ pub trait BfField: AbstractField + TwoAdicField + Clone + Copy +{
         Self::from_wrapped_u32(Self::MOD)
     }
 
-    fn as_u32_vec(&self)->Vec<u32>;
+    fn as_u32_vec(&self) -> Vec<u32>;
 }
-
-
-
 
 pub trait FieldAsSlice: BfField {
     fn as_slice(&self) -> &[u32];
 }
 
-
 impl BfField for BabyBear {
     const BIS_SIZE: usize = 32;
     const MOD: u32 = 0x78000001;
-    const U32_SIZE:usize = 1;
-    
-    fn as_u32_vec(&self)->Vec<u32> {
+    const U32_SIZE: usize = 1;
+
+    fn as_u32_vec(&self) -> Vec<u32> {
         vec![self.as_canonical_u32()]
     }
 }
-
-
 
 impl BfField for BinomialExtensionField<BabyBear, 4> {
     // type AsU32Output = Vec<u32>;
     const BIS_SIZE: usize = 32;
     const MOD: u32 = 0x78000001;
-    const U32_SIZE:usize = 4;
-    
-    fn as_u32_vec(&self)->Vec<u32> {
-        self.as_base_slice().iter().map(|babybear:&BabyBear| babybear.as_canonical_u32()).collect()
+    const U32_SIZE: usize = 4;
+
+    fn as_u32_vec(&self) -> Vec<u32> {
+        self.as_base_slice()
+            .iter()
+            .map(|babybear: &BabyBear| babybear.as_canonical_u32())
+            .collect()
     }
 }
-
 
 mod tests {
     use super::*;
@@ -95,20 +89,4 @@ mod tests {
 
         assert_eq!(BabyBear::field_mod() - subgroups[0], subgroups[2]);
     }
-
 }
-
-// impl NativeField for u32{
-//     const BIS_SIZE:usize = 32;
-//     fn as_u32(&self) -> u32{
-//         return *self;
-//     }
-
-//     fn from_u32(data: u32) -> Self{
-//         return data;
-//     }
-
-//     fn group_genreator(group_size: u32) -> Self {
-//         return 1
-//     }
-// }

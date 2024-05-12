@@ -44,18 +44,6 @@ pub trait Mmcs<T: Send + Sync>: Clone {
         prover_data: &Self::ProverData<M>,
     ) -> (Vec<Vec<T>>, Self::Proof);
 
-    fn open_taptree(&self, index: usize, prover_data: &Self::ProverData) -> Self::Proof {
-        unimplemented!();
-    }
-
-    fn verify_taptree(
-        &self,
-        proof: &Self::Proof,
-        root: &Self::Commitment,
-    ) -> Result<(), Self::Error> {
-        unimplemented!();
-    }
-
     /// Get the matrices that were committed to.
     fn get_matrices<'a, M: Matrix<T>>(&self, prover_data: &'a Self::ProverData<M>) -> Vec<&'a M>;
 

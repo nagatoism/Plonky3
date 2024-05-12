@@ -5,11 +5,8 @@
 // how to searlize the leaf
 // use which hash to hash the leaf script
 
-use std::marker::PhantomData;
 use std::usize;
 
-use bitcoin::hashes::{hash160, Hash};
-use bitcoin::opcodes::{OP_EQUAL, OP_EQUALVERIFY, OP_SWAP};
 use bitcoin::ScriptBuf as Script;
 use bitcoin_script::{define_pushable, script};
 
@@ -141,10 +138,11 @@ pub fn u8_to_hex_str(byte: &u8) -> String {
 #[cfg(test)]
 mod test {
     use p3_baby_bear::BabyBear;
+    use p3_field::AbstractField;
     use rand::Rng;
 
     use super::*;
-    use crate::{execute_script_with_inputs};
+    use crate::execute_script_with_inputs;
 
     #[test]
     fn test_leaf_execution() {
@@ -164,7 +162,8 @@ mod test {
 
         let mut sigs: Vec<Vec<u8>> = Vec::new();
         for i in 0..num_polys {
-            let signature = leaf.evaluations_commitments[num_polys - 1 - i].commitments[0].signature();
+            let signature =
+                leaf.evaluations_commitments[num_polys - 1 - i].commitments[0].signature();
             signature.iter().for_each(|item| sigs.push(item.to_vec()));
         }
         let signature = leaf.x_commitment.commitments[0].signature();

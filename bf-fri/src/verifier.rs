@@ -1,19 +1,15 @@
 use alloc::vec;
 use alloc::vec::Vec;
 
-use bf_scripts::{execute_script, execute_script_with_inputs, BfField};
+use bf_scripts::execute_script;
 use bitcoin::taproot::TapLeaf;
-use bitcoin::Script;
 use itertools::izip;
 use p3_challenger::{CanObserve, CanSample, GrindingChallenger};
-use p3_commit::Mmcs;
 use p3_field::{Field, TwoAdicField};
-use p3_matrix::Dimensions;
 use p3_util::reverse_bits_len;
 
-use crate::{
-    get_leaf_index_by_query_index, BfCommitPhaseProofStep, BfQueryProof, FriConfig, FriProof,
-};
+use crate::bf_mmcs::BFMmcs;
+use crate::{BfCommitPhaseProofStep, BfQueryProof, FriConfig, FriProof};
 
 #[derive(Debug)]
 pub enum FriError<CommitMmcsErr> {
@@ -36,7 +32,7 @@ pub fn verify_shape_and_sample_challenges<F, M, Challenger>(
 ) -> Result<FriChallenges<F>, FriError<M::Error>>
 where
     F: Field,
-    M: Mmcs<F, Proof = BfCommitPhaseProofStep>,
+    M: BFMmcs<F, Proof = BfCommitPhaseProofStep>,
     Challenger: GrindingChallenger + CanObserve<M::Commitment> + CanSample<F>,
 {
     let betas: Vec<F> = proof
@@ -68,7 +64,7 @@ where
         betas,
     })
 }
-struct OpeningData<F: TwoAdicField> {
+pub struct OpeningData<F: TwoAdicField> {
     leaf_index: usize,
     value: F,
     sibling_leaf_index: usize,
@@ -82,7 +78,7 @@ pub fn verify_challenges<F, M, Witness>(
 ) -> Result<(), FriError<M::Error>>
 where
     F: TwoAdicField,
-    M: Mmcs<F, Proof = BfCommitPhaseProofStep>,
+    M: BFMmcs<F, Proof = BfCommitPhaseProofStep>,
 {
     let log_max_height = proof.commit_phase_commits.len() + config.log_blowup;
     for (&index, query_proof, ro) in izip!(
@@ -119,7 +115,7 @@ fn verify_query<F, M>(
 ) -> Result<F, FriError<M::Error>>
 where
     F: TwoAdicField,
-    M: Mmcs<F, Proof = BfCommitPhaseProofStep>,
+    M: BFMmcs<F, Proof = BfCommitPhaseProofStep>,
 {
     let mut folded_eval = F::zero();
     let mut r = F::zero();
@@ -169,10 +165,6 @@ where
             .verify_taptree(step, commit)
             .map_err(FriError::CommitPhaseMmcsError)?;
 
-        // let mut xs: [F; 2] = [x; 2];
-        // // calculate the x-coordiate using index*generator
-        // xs[index_sibling % 2] *= F::two_adic_generator(1);// with subgroup [1,generator]
-        // interpolate and evaluate at beta
         y_r = evals[0] + (beta - xs[0]) * (evals[1] - evals[0]) / (xs[1] - xs[0]);
 
         index = index_pair;

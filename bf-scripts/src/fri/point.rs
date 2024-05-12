@@ -4,13 +4,8 @@ use bitcoin::ScriptBuf as Script;
 use bitcoin_script::{define_pushable, script};
 
 use super::bit_comm::*;
-use crate::{
-    BCAssignment, BfField,
-};
+use crate::{BCAssignment, BfField};
 define_pushable!();
-
-
-
 
 pub struct PointsLeaf<F: BfField> {
     leaf_index_1: usize,
@@ -52,7 +47,6 @@ impl<F: BfField> PointsLeaf<F> {
     }
 }
 
-
 pub struct Points<F: BfField> {
     p1: Point<F>,
     p2: Point<F>,
@@ -81,8 +75,6 @@ impl<F: BfField> Points<F> {
     }
 }
 
-
-
 pub struct Point<F: BfField> {
     x: F,
     y: F,
@@ -95,7 +87,10 @@ impl<F: BfField> Point<F> {
         let x_commit = bc_assign.assign_field(x);
         let y_commit = bc_assign.assign_field(y);
         Self {
-           x,y,x_commit,y_commit
+            x,
+            y,
+            x_commit,
+            y_commit,
         }
     }
 
@@ -162,8 +157,8 @@ mod test {
     use rand_chacha::ChaCha20Rng;
 
     use super::*;
+    use crate::execute_script_with_inputs;
     use crate::fri::field::BfField;
-    use crate::{execute_script_with_inputs};
 
     type F = BabyBear;
     type EF = p3_field::extension::BinomialExtensionField<BabyBear, 4>;

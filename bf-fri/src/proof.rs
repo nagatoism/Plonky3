@@ -1,16 +1,17 @@
 use alloc::vec::Vec;
 
 use bitcoin::taproot::{LeafNode, TapLeaf, TaprootMerkleBranch};
-use p3_commit::Mmcs;
 use p3_field::Field;
 use serde::{Deserialize, Serialize};
+
+use crate::bf_mmcs::BFMmcs;
 
 #[derive(Serialize, Deserialize)]
 #[serde(bound(
     serialize = "Witness: Serialize",
     deserialize = "Witness: Deserialize<'de>"
 ))]
-pub struct FriProof<F: Field, M: Mmcs<F>, Witness> {
+pub struct FriProof<F: Field, M: BFMmcs<F>, Witness> {
     pub(crate) commit_phase_commits: Vec<M::Commitment>,
     pub(crate) query_proofs: Vec<BfQueryProof>,
     // This could become Vec<FC::Challenge> if this library was generalized to support non-constant
@@ -27,7 +28,7 @@ pub struct BfQueryProof {
     pub(crate) commit_phase_openings: Vec<BfCommitPhaseProofStep>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 // #[serde(bound(serialize = "F: Serialize"))]
 #[serde(bound = "")]
 pub struct BfCommitPhaseProofStep {

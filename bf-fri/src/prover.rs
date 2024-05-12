@@ -3,11 +3,11 @@ use alloc::vec::Vec;
 
 use itertools::Itertools;
 use p3_challenger::{CanObserve, CanSample, GrindingChallenger};
-use p3_commit::{DirectMmcs, Mmcs};
 use p3_field::{Field, TwoAdicField};
 use p3_matrix::dense::RowMajorMatrix;
 use tracing::{info_span, instrument};
 
+use crate::bf_mmcs::BFMmcs;
 use crate::fold_even_odd::fold_even_odd;
 use crate::{BfCommitPhaseProofStep, BfQueryProof, FriConfig, FriProof};
 
@@ -19,11 +19,11 @@ pub fn bf_prove<F, M, Challenger>(
 ) -> (FriProof<F, M, Challenger::Witness>, Vec<usize>)
 where
     F: TwoAdicField,
-    M: DirectMmcs<F, Proof = BfCommitPhaseProofStep>,
+    M: BFMmcs<F, Proof = BfCommitPhaseProofStep>,
     Challenger: GrindingChallenger + CanObserve<M::Commitment> + CanSample<F>,
 {
     // ToDo: support Muti-Matrixs
-    assert_eq!(input.len(), 1);
+    // assert_eq!(input.len(), 1);
 
     // 1. rposition start iterator from the end and calculate the valid leagth of the polynomial want commit
     let log_max_height = input.iter().rposition(Option::is_some).unwrap();
@@ -61,7 +61,7 @@ fn bf_answer_query<F, M>(
 ) -> BfQueryProof
 where
     F: Field,
-    M: Mmcs<F, Proof = BfCommitPhaseProofStep>,
+    M: BFMmcs<F, Proof = BfCommitPhaseProofStep>,
 {
     let commit_phase_openings = commit_phase_commits
         .iter()
@@ -78,8 +78,7 @@ where
         commit_phase_openings,
     }
 }
-
-pub const BF_MATRIX_WIDTH: usize = 1;
+// Commit two adjacent points to a leaf node
 pub const DEFAULT_MATRIX_WIDTH: usize = 2;
 
 #[instrument(name = "commit phase", skip_all)]
@@ -91,7 +90,7 @@ fn bf_commit_phase<F, M, Challenger>(
 ) -> CommitPhaseResult<F, M>
 where
     F: TwoAdicField,
-    M: DirectMmcs<F>,
+    M: BFMmcs<F>,
     Challenger: CanObserve<M::Commitment> + CanSample<F>,
 {
     let mut current = input[log_max_height].as_ref().unwrap().clone();
@@ -99,7 +98,7 @@ where
     let mut commits = vec![];
     let mut data = vec![];
 
-    for log_folded_height in (config.log_blowup..log_max_height).rev() {
+    for _log_folded_height in (config.log_blowup..log_max_height).rev() {
         let leaves = RowMajorMatrix::new(current.clone(), DEFAULT_MATRIX_WIDTH);
         let (commit, prover_data) = config.mmcs.commit_matrix(leaves);
         challenger.observe(commit.clone());
@@ -128,7 +127,7 @@ where
     }
 }
 
-struct CommitPhaseResult<F, M: Mmcs<F>> {
+struct CommitPhaseResult<F: Send + Sync, M: BFMmcs<F>> {
     commits: Vec<M::Commitment>,
     data: Vec<M::ProverData>,
     final_poly: F,
