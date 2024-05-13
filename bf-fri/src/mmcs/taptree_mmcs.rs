@@ -5,6 +5,7 @@ use core::usize;
 use bf_scripts::BfField;
 use bitcoin::hashes::Hash as Bitcoin_HASH;
 use bitcoin::TapNodeHash;
+use p3_field::{u256_to_u32, u32_to_u256, PermutationField, U256, U32};
 use p3_matrix::dense::{RowMajorMatrix, RowMajorMatrixView};
 use p3_matrix::{Dimensions, Matrix};
 use p3_util::log2_strict_usize;
@@ -14,22 +15,24 @@ use crate::error::BfError;
 use crate::taptree::PolyCommitTree;
 use crate::BfCommitPhaseProofStep;
 
+pub type TreeRoot = [U32; ROOT_WIDTH];
+pub const ROOT_WIDTH: usize = 8;
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
-pub struct TapTreeMmcs<F, const DIGEST_ELEMS: usize> {
+pub struct TapTreeMmcs<F> {
     _marker: PhantomData<F>,
 }
 
-impl<F, const DIGEST_ELEMS: usize> TapTreeMmcs<F, DIGEST_ELEMS> {
+impl<F> TapTreeMmcs<F> {
     pub fn new() -> Self {
         Self {
             _marker: PhantomData,
         }
     }
 }
-impl<F: BfField, const DIGEST_ELEMS: usize> BFMmcs<F> for TapTreeMmcs<F, DIGEST_ELEMS> {
+impl<F: BfField> BFMmcs<F> for TapTreeMmcs<F> {
     type ProverData = PolyCommitTree<1>;
     type Proof = BfCommitPhaseProofStep;
-    type Commitment = [u8; 32];
+    type Commitment = TreeRoot;
     type Error = BfError;
 
     fn open_taptree(&self, index: usize, prover_data: &PolyCommitTree<1>) -> Self::Proof {
@@ -47,7 +50,7 @@ impl<F: BfField, const DIGEST_ELEMS: usize> BFMmcs<F> for TapTreeMmcs<F, DIGEST_
         proof: &Self::Proof,
         root: &Self::Commitment,
     ) -> Result<(), Self::Error> {
-        let root_node = TapNodeHash::from_byte_array(root.clone());
+        let root_node = TapNodeHash::from_byte_array(u32_to_u256(root.clone()));
         let mut first_node_hash = TapNodeHash::from_node_hashes(root_node, proof.merkle_branch[0]);
         proof.merkle_branch[1..]
             .into_iter()
@@ -66,7 +69,8 @@ impl<F: BfField, const DIGEST_ELEMS: usize> BFMmcs<F> for TapTreeMmcs<F, DIGEST_
         let mut tree = PolyCommitTree::<1>::new(log_leaves);
 
         tree.commit_rev_points(inputs[0].values.clone(), inputs[0].width);
-        let root = tree.root().clone();
-        (root.node_hash().as_byte_array().clone(), tree)
+        let root: U256 = tree.root().node_hash().as_byte_array().clone();
+
+        (u256_to_u32(root), tree)
     }
 }

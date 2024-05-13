@@ -4,8 +4,8 @@ use core::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub, SubAssign};
 
 use num_bigint::BigUint;
 use p3_field::{
-    exp_1725656503, exp_u64_by_squaring, halve_u32, AbstractField, Field, Packable, PrimeField,
-    PrimeField32, PrimeField64, TwoAdicField,
+    exp_1725656503, exp_u64_by_squaring, halve_u32, AbstractField, ChallengeField, Field, Packable,
+    PrimeField, PrimeField32, PrimeField64, TwoAdicField,
 };
 use rand::distributions::{Distribution, Standard};
 use rand::Rng;
@@ -283,6 +283,8 @@ impl PrimeField32 for BabyBear {
         from_monty(self.value)
     }
 }
+
+impl ChallengeField<4> for BabyBear {}
 
 impl TwoAdicField for BabyBear {
     const TWO_ADICITY: usize = 27;

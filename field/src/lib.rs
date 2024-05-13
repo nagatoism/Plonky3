@@ -6,6 +6,7 @@ extern crate alloc;
 
 mod array;
 mod batch_inverse;
+mod challenger;
 mod exponentiation;
 pub mod extension;
 mod field;
@@ -14,6 +15,7 @@ mod packed;
 
 pub use array::*;
 pub use batch_inverse::*;
+pub use challenger::*;
 pub use exponentiation::*;
 pub use field::*;
 pub use helpers::*;

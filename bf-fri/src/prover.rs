@@ -2,7 +2,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use itertools::Itertools;
-use p3_challenger::{CanObserve, CanSample, GrindingChallenger};
+use p3_challenger::{BfGrindingChallenger, CanObserve, CanSample, GrindingChallenger};
 use p3_field::{Field, TwoAdicField};
 use p3_matrix::dense::RowMajorMatrix;
 use tracing::{info_span, instrument};
@@ -20,7 +20,7 @@ pub fn bf_prove<F, M, Challenger>(
 where
     F: TwoAdicField,
     M: BFMmcs<F, Proof = BfCommitPhaseProofStep>,
-    Challenger: GrindingChallenger + CanObserve<M::Commitment> + CanSample<F>,
+    Challenger: BfGrindingChallenger + CanObserve<M::Commitment> + CanSample<F>,
 {
     // ToDo: support Muti-Matrixs
     // assert_eq!(input.len(), 1);
@@ -98,7 +98,7 @@ where
     let mut commits = vec![];
     let mut data = vec![];
 
-    for _log_folded_height in (config.log_blowup..log_max_height).rev() {
+    for log_folded_height in (config.log_blowup..log_max_height).rev() {
         let leaves = RowMajorMatrix::new(current.clone(), DEFAULT_MATRIX_WIDTH);
         let (commit, prover_data) = config.mmcs.commit_matrix(leaves);
         challenger.observe(commit.clone());
@@ -131,4 +131,100 @@ struct CommitPhaseResult<F: Send + Sync, M: BFMmcs<F>> {
     commits: Vec<M::Commitment>,
     data: Vec<M::ProverData>,
     final_poly: F,
+}
+
+#[cfg(test)]
+mod tests {
+
+    use bf_scripts::BabyBear;
+    use p3_challenger::{BfChallenger, BfGrindingChallenger};
+    use p3_dft::{Radix2Dit, TwoAdicSubgroupDft};
+    use p3_field::{AbstractField, PrimeField64, U32};
+    use p3_matrix::util::reverse_matrix_index_bits;
+    use p3_matrix::Matrix;
+    use p3_symmetric::{CryptographicPermutation, Permutation};
+    use p3_util::log2_strict_usize;
+    use rand::{Rng, SeedableRng};
+    use rand_chacha::ChaCha20Rng;
+
+    use super::*;
+    use crate::mmcs::taptree_mmcs::{TreeRoot, ROOT_WIDTH};
+    use crate::taptree_mmcs::TapTreeMmcs;
+
+    type PF = U32;
+    const WIDTH: usize = ROOT_WIDTH;
+    type F = BabyBear;
+    #[derive(Clone)]
+    struct TestPermutation {}
+
+    impl Permutation<TreeRoot> for TestPermutation {
+        fn permute(&self, mut input: TreeRoot) -> TreeRoot {
+            self.permute_mut(&mut input);
+            input
+        }
+
+        fn permute_mut(&self, input: &mut TreeRoot) {
+            input.reverse();
+        }
+    }
+
+    impl CryptographicPermutation<TreeRoot> for TestPermutation {}
+
+    type Val = BabyBear;
+    type ValMmcs = TapTreeMmcs<Val>;
+    // type Challenge =
+    // type Challenge = ValMmcs::Commitment;
+    type MyFriConfig = FriConfig<ValMmcs>;
+
+    #[test]
+    fn test_commit_phase() {
+        let permutation = TestPermutation {};
+        let mut challenger =
+            BfChallenger::<F, PF, TestPermutation, WIDTH>::new(permutation).unwrap();
+        let mmcs = ValMmcs::new();
+        let fri_config = FriConfig {
+            log_blowup: 1,
+            num_queries: 10,
+            proof_of_work_bits: 8,
+            mmcs,
+        };
+
+        let dft = Radix2Dit::default();
+
+        let shift = Val::generator();
+        let mut rng = ChaCha20Rng::seed_from_u64(0);
+
+        let ldes: Vec<RowMajorMatrix<Val>> = (9..10)
+            .map(|deg_bits| {
+                let evals = RowMajorMatrix::<Val>::rand_nonzero(&mut rng, 1 << deg_bits, 1);
+                let mut lde = dft.coset_lde_batch(evals, 1, shift);
+                reverse_matrix_index_bits(&mut lde);
+                lde
+            })
+            .collect();
+
+        let alpha = BabyBear::one();
+        let input: [_; 32] = core::array::from_fn(|log_height| {
+            let matrices_with_log_height: Vec<&RowMajorMatrix<Val>> = ldes
+                .iter()
+                .filter(|m| log2_strict_usize(m.height()) == log_height)
+                .collect();
+            if matrices_with_log_height.is_empty() {
+                None
+            } else {
+                let reduced: Vec<BabyBear> = (0..(1 << log_height))
+                    .map(|r| {
+                        alpha
+                            .powers()
+                            .zip(matrices_with_log_height.iter().flat_map(|m| m.row(r)))
+                            .map(|(alpha_pow, v)| alpha_pow * v)
+                            .sum()
+                    })
+                    .collect();
+                Some(reduced)
+            }
+        });
+
+        let (proof, idxs) = bf_prove(&fri_config, &input, &mut challenger);
+    }
 }

@@ -1,7 +1,6 @@
 use alloc::vec;
 use alloc::vec::Vec;
 
-use bitcoin::TapNodeHash;
 use p3_field::{ExtensionField, Field, PrimeField64};
 use p3_symmetric::{CryptographicPermutation, Hash};
 
