@@ -65,7 +65,6 @@ where
     output_buffer: Vec<PF>,
     permutation: P,
     _marker: PhantomData<F>,
-    // num_f_elms: usize,
 }
 
 impl<F, PF, P, const WIDTH: usize> BfChallenger<F, PF, P, WIDTH>

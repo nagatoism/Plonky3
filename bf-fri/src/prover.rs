@@ -22,8 +22,6 @@ where
     M: BFMmcs<F, Proof = BfCommitPhaseProofStep>,
     Challenger: BfGrindingChallenger + CanObserve<M::Commitment> + CanSample<F>,
 {
-    // ToDo: support Muti-Matrixs
-    // assert_eq!(input.len(), 1);
 
     // 1. rposition start iterator from the end and calculate the valid leagth of the polynomial want commit
     let log_max_height = input.iter().rposition(Option::is_some).unwrap();
@@ -152,23 +150,24 @@ mod tests {
     use crate::taptree_mmcs::TapTreeMmcs;
 
     type PF = U32;
-    const WIDTH: usize = ROOT_WIDTH;
+    const WIDTH: usize =  16;
+    type SpongeState = [PF;WIDTH];
     type F = BabyBear;
     #[derive(Clone)]
     struct TestPermutation {}
 
-    impl Permutation<TreeRoot> for TestPermutation {
-        fn permute(&self, mut input: TreeRoot) -> TreeRoot {
+    impl Permutation<SpongeState> for TestPermutation {
+        fn permute(&self, mut input: SpongeState) -> SpongeState {
             self.permute_mut(&mut input);
             input
         }
 
-        fn permute_mut(&self, input: &mut TreeRoot) {
+        fn permute_mut(&self, input: &mut SpongeState) {
             input.reverse();
         }
     }
 
-    impl CryptographicPermutation<TreeRoot> for TestPermutation {}
+    impl CryptographicPermutation<SpongeState> for TestPermutation {}
 
     type Val = BabyBear;
     type ValMmcs = TapTreeMmcs<Val>;
