@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use bf_scripts::execute_script;
 use bitcoin::taproot::TapLeaf;
 use itertools::izip;
-use p3_challenger::{CanObserve, CanSample, GrindingChallenger};
+use p3_challenger::{BfGrindingChallenger, CanObserve, CanSample};
 use p3_field::{Field, TwoAdicField};
 use p3_util::reverse_bits_len;
 
@@ -33,7 +33,7 @@ pub fn verify_shape_and_sample_challenges<F, M, Challenger>(
 where
     F: Field,
     M: BFMmcs<F, Proof = BfCommitPhaseProofStep>,
-    Challenger: GrindingChallenger + CanObserve<M::Commitment> + CanSample<F>,
+    Challenger: BfGrindingChallenger + CanObserve<M::Commitment> + CanSample<F>,
 {
     let betas: Vec<F> = proof
         .commit_phase_commits

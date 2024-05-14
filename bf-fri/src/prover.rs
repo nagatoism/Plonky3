@@ -148,6 +148,7 @@ mod tests {
     use super::*;
     use crate::mmcs::taptree_mmcs::{TreeRoot, ROOT_WIDTH};
     use crate::taptree_mmcs::TapTreeMmcs;
+    use crate::verifier;
 
     type PF = U32;
     const WIDTH: usize = 16;
@@ -222,5 +223,30 @@ mod tests {
         });
 
         let (proof, idxs) = bf_prove(&fri_config, &input, &mut challenger);
+
+        let log_max_height = input.iter().rposition(Option::is_some).unwrap();
+        let reduced_openings: Vec<[BabyBear; 32]> = idxs
+            .into_iter()
+            .map(|idx| {
+                input
+                    .iter()
+                    .enumerate()
+                    .map(|(log_height, v)| {
+                        if let Some(v) = v {
+                            v[idx >> (log_max_height - log_height)]
+                        } else {
+                            BabyBear::zero()
+                        }
+                    })
+                    .collect_vec()
+                    .try_into()
+                    .unwrap()
+            })
+            .collect();
+
+        // let _alpha: Challenge = challenger.sample_ext_element();
+        let fri_challenges =
+            verifier::verify_shape_and_sample_challenges(&fri_config, &proof, &mut challenger)
+                .expect("failed verify shape and sample");
     }
 }
