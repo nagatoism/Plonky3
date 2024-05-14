@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 use core::marker::PhantomData;
-use core::usize;
+use core::{panic, usize};
 
 use bf_scripts::BfField;
 use bitcoin::hashes::Hash as Bitcoin_HASH;
@@ -12,6 +12,7 @@ use p3_util::log2_strict_usize;
 
 use super::bf_mmcs::BFMmcs;
 use crate::error::BfError;
+use crate::prover::LOG_DEFAULT_MATRIX_WIDTH;
 use crate::taptree::PolyCommitTree;
 use crate::BfCommitPhaseProofStep;
 
@@ -36,7 +37,19 @@ impl<F: BfField> BFMmcs<F> for TapTreeMmcs<F> {
     type Error = BfError;
 
     fn open_taptree(&self, index: usize, prover_data: &PolyCommitTree<1>) -> Self::Proof {
-        let opening_leaf = prover_data.get_leaf(index).unwrap().clone();
+        // The matrix with width-2 lead to the index need to right shift 1-bit
+        let leaf = prover_data.get_leaf(index >> LOG_DEFAULT_MATRIX_WIDTH);
+        let opening_leaf = match leaf {
+            Some(v) => v,
+            None => {
+                println!(
+                    "leaf index:{:?}, leaf count:{:?}",
+                    index,
+                    prover_data.leaf_count()
+                );
+                panic!("invalid leaf index")
+            }
+        };
         let merkle_branch = opening_leaf.merkle_branch().clone();
         let leaf = opening_leaf.leaf().clone();
         BfCommitPhaseProofStep {

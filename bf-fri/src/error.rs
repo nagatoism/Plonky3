@@ -9,6 +9,7 @@ pub enum BfError {
     EvaluationLeafError,
     ExecuteScriptError,
     InvalidMerkleProof,
+    IndexWithEmptyLeaf(u32, u32),
 }
 
 impl From<TaprootBuilderError> for BfError {

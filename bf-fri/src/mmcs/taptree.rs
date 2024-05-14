@@ -119,6 +119,7 @@ impl<const NUM_POLY: usize> DerefMut for PolyCommitTree<NUM_POLY> {
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct BasicTree<const NUM_POLY: usize> {
     root_node: Option<NodeInfo>,
+    leaf_count: u64,
     tree_builder: Option<TreeBuilder>,
 }
 
@@ -126,11 +127,13 @@ impl<const NUM_POLY: usize> BasicTree<NUM_POLY> {
     pub fn new(log_poly_points: usize) -> Self {
         Self {
             root_node: None,
+            leaf_count: 0,
             tree_builder: Some(TreeBuilder::new(log_poly_points)),
         }
     }
 
     pub fn add_leaf(&mut self, leaf_script: ScriptBuf) {
+        self.leaf_count += 1;
         self.mut_tree_builder().add_leaf(leaf_script);
     }
 
@@ -167,6 +170,7 @@ impl<const NUM_POLY: usize> BasicTree<NUM_POLY> {
         let combined_tree = combine_two_nodes(self.root().clone(), other.root().clone()).unwrap();
         Self {
             root_node: Some(combined_tree),
+            leaf_count: self.leaf_count() + other.leaf_count(),
             tree_builder: None,
         }
     }
@@ -174,6 +178,10 @@ impl<const NUM_POLY: usize> BasicTree<NUM_POLY> {
     pub fn finalize(&mut self) {
         self.root_node = Some(self.tree_builder.as_mut().unwrap().root());
         self.tree_builder = None;
+    }
+
+    pub fn leaf_count(&self) -> u64 {
+        self.leaf_count
     }
 
     pub fn leaves(&self) -> LeafNodes {
@@ -210,6 +218,7 @@ impl<const NUM_POLY: usize> From<NodeInfo> for BasicTree<NUM_POLY> {
     fn from(value: NodeInfo) -> Self {
         Self {
             root_node: Some(value),
+            leaf_count: 0,
             tree_builder: None,
         }
     }

@@ -22,7 +22,6 @@ where
     M: BFMmcs<F, Proof = BfCommitPhaseProofStep>,
     Challenger: BfGrindingChallenger + CanObserve<M::Commitment> + CanSample<F>,
 {
-
     // 1. rposition start iterator from the end and calculate the valid leagth of the polynomial want commit
     let log_max_height = input.iter().rposition(Option::is_some).unwrap();
 
@@ -78,6 +77,7 @@ where
 }
 // Commit two adjacent points to a leaf node
 pub const DEFAULT_MATRIX_WIDTH: usize = 2;
+pub const LOG_DEFAULT_MATRIX_WIDTH: usize = 1;
 
 #[instrument(name = "commit phase", skip_all)]
 fn bf_commit_phase<F, M, Challenger>(
@@ -150,8 +150,8 @@ mod tests {
     use crate::taptree_mmcs::TapTreeMmcs;
 
     type PF = U32;
-    const WIDTH: usize =  16;
-    type SpongeState = [PF;WIDTH];
+    const WIDTH: usize = 16;
+    type SpongeState = [PF; WIDTH];
     type F = BabyBear;
     #[derive(Clone)]
     struct TestPermutation {}
@@ -168,11 +168,8 @@ mod tests {
     }
 
     impl CryptographicPermutation<SpongeState> for TestPermutation {}
-
     type Val = BabyBear;
     type ValMmcs = TapTreeMmcs<Val>;
-    // type Challenge =
-    // type Challenge = ValMmcs::Commitment;
     type MyFriConfig = FriConfig<ValMmcs>;
 
     #[test]
