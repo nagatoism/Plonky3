@@ -1,9 +1,6 @@
 use alloc::vec;
 use core::array;
 
-use num_bigint::BigUint;
-use num_traits::ToBytes;
-
 use crate::PrimeField32;
 pub trait ChallengeField<const U8_NUM: usize>: PrimeField32 + Clone + Default + Copy + Ord {
     fn u8_num() -> usize {
