@@ -8,7 +8,6 @@ use p3_field::{
 use rand::Rng;
 
 pub trait BfField: AbstractField + TwoAdicField + Clone + Copy {
-    // type AsU32Output;
     const BIS_SIZE: usize;
     const MOD: u32;
     const U32_SIZE: usize;
@@ -56,7 +55,6 @@ impl BfField for BabyBear {
 }
 
 impl BfField for BinomialExtensionField<BabyBear, 4> {
-    // type AsU32Output = Vec<u32>;
     const BIS_SIZE: usize = 32;
     const MOD: u32 = 0x78000001;
     const U32_SIZE: usize = 4;
