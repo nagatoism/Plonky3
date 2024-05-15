@@ -1,10 +1,9 @@
 use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
-use core::array;
 use core::marker::PhantomData;
 
-use p3_field::{ChallengeField, PermutationField, PrimeField32, PrimeField64};
+use p3_field::{ChallengeField, PermutationField, PrimeField32};
 use p3_maybe_rayon::prelude::*;
 use p3_symmetric::{CryptographicPermutation, Hash};
 use tracing::instrument;
