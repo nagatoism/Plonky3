@@ -186,7 +186,7 @@ impl<const NUM_POLY: usize> BasicTree<NUM_POLY> {
     }
 
     pub fn leaves(&self) -> LeafNodes {
-        self.isfinalize();
+        assert!(self.isfinalize());
         let nodes = self.root_node.as_ref().unwrap().leaf_nodes();
         nodes
     }
@@ -276,6 +276,41 @@ impl TreeBuilder {
         }
         self.leaves.truncate(nodes_len / 2);
     }
+
+    pub fn root_and_leaf_order(&mut self) -> NodeInfo {
+        let mut order = Vec::new();
+        let nodes_len = self.leaves.len();
+        for i in 0..nodes_len{
+            order.push(i);
+        }
+
+        assert!(self.leaves.len() as u32 == 2u32.pow(self.log_leaves as u32));
+        for i in 0..self.log_leaves {
+            self.build_layer_with_order((self.log_leaves - i) as u32,&mut order);
+        }
+        assert!(self.leaves.len() == 1);
+        self.leaves[0].clone()
+    }
+
+    fn build_layer_with_order(&mut self, depth: u32, &mut order:&mut Vec<usize>){
+        let chunk_size:usize = 1 << (self.log_leaves - depth as usize);
+        let left_first = false;
+        let nodes_len = self.leaves.len();
+        assert!(nodes_len as u32 == 2u32.pow(depth));
+        for i in (0..nodes_len).step_by(2) {
+            (self.leaves[i / 2],left_first) =
+                NodeInfo::combine_with_order(self.leaves[i].clone(), self.leaves[i + 1].clone()).unwrap();
+            if !left_first{
+                let start = i * chunk_size;
+                let mid = (i + 1) * chunk_size;
+                let end = (i + 2) * chunk_size;
+
+                order[start..mid].swap_with_slice(&mut order[mid..end]);
+            }
+        }
+        self.leaves.truncate(nodes_len / 2);
+    }
+
 }
 
 #[derive(PartialEq)]
@@ -484,44 +519,32 @@ mod tests {
             BabyBear::from_canonical_u32(2),
             BabyBear::from_canonical_u32(3),
             BabyBear::from_canonical_u32(4),
+            BabyBear::from_canonical_u32(4),
+            BabyBear::from_canonical_u32(4),
+            BabyBear::from_canonical_u32(4),
+            BabyBear::from_canonical_u32(4),
         ];
+
         let poly1 = Polynomials::new(coeffs1, PolynomialType::Coeff);
         let eva_poly1 = poly1.convert_to_evals_at_subgroup();
         let evas1 = eva_poly1.values();
 
-        let mut field_taptree_1 = PolyCommitTree::<BabyBear, 1>::new(2);
+        let mut poly_taptree = PolyCommitTree::<BabyBear, 1>::new(2);
 
-        for i in 0..evas1.len() {
-            let leaf_script = construct_evaluation_leaf_script::<1, F>(
-                i,
-                eva_poly1.points[i],
-                vec![evas1[i].clone()],
-            )
-            .unwrap();
-            field_taptree_1.tree.add_leaf(leaf_script);
-        }
-
-        let coeffs2: Vec<BabyBear> = vec![
-            BabyBear::from_canonical_u32(4),
-            BabyBear::from_canonical_u32(3),
-            BabyBear::from_canonical_u32(2),
-            BabyBear::from_canonical_u32(1),
-        ];
-        let poly2 = Polynomials::new(coeffs2, PolynomialType::Coeff);
-        let eva_poly2 = poly2.convert_to_evals_at_subgroup();
-        let evas2 = eva_poly2.values();
-        assert!(evas2.len() == 4);
-
-        field_taptree_1.finalize();
+        poly_taptree.commit_rev_points(evas1.clone(),2);
 
         (0..4).into_iter().for_each(|index| {
-            let inclusion = field_taptree_1.verify_inclusion_by_index(index);
-            assert_eq!(inclusion, true);
+            let leaf = poly_taptree.get_leaf(index).unwrap();
+            let script = leaf.leaf().as_script().unwrap();
+            let points_leaf = poly_taptree.get_points_leaf(index);
+            assert_eq!(points_leaf.recover_points_euqal_to_commited_point(),*script.0);
             let success = verify_inclusion(
-                field_taptree_1.root().node_hash(),
-                field_taptree_1.get_leaf(index).unwrap(),
+                poly_taptree.root().node_hash(),
+                leaf,
             );
             assert_eq!(success, true);
         });
+
+
     }
 }

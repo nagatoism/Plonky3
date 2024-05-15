@@ -178,3 +178,119 @@ where
 
     Ok(folded_eval)
 }
+
+
+pub fn bf_verify_challenges<F, M, Witness>(
+    config: &FriConfig<M>,
+    proof: &FriProof<F, M, Witness>,
+    challenges: &FriChallenges<F>,
+    reduced_openings: &[[F; 32]],
+) -> Result<(), FriError<M::Error>>
+where
+    F: BfField,
+    M: BFMmcs<F, Proof = BfCommitPhaseProofStep<F>>,
+{
+    let log_max_height = proof.commit_phase_commits.len() + config.log_blowup;
+    for (&index, query_proof, ro) in izip!(
+        &challenges.query_indices,
+        &proof.query_proofs,
+        reduced_openings
+    ) {
+        let folded_eval = verify_query(
+            config,
+            &proof.commit_phase_commits,
+            index,
+            query_proof,
+            &challenges.betas,
+            ro,
+            log_max_height,
+        )?;
+
+        if folded_eval != proof.final_poly {
+            return Err(FriError::FinalPolyMismatch);
+        }
+    }
+
+    Ok(())
+}
+
+fn bf_verify_query<F, M>(
+    config: &FriConfig<M>,
+    commit_phase_commits: &[M::Commitment],
+    mut index: usize,
+    proof: &BfQueryProof<F>,
+    betas: &[F],
+    reduced_openings: &[F; 32],
+    log_max_height: usize,
+) -> Result<F, FriError<M::Error>>
+where
+    F: BfField,
+    M: BFMmcs<F, Proof = BfCommitPhaseProofStep<F>>,
+{
+    let mut folded_eval = F::zero();
+
+    let mut x = F::two_adic_generator(log_max_height)
+        .exp_u64(reverse_bits_len(index, log_max_height) as u64);
+
+    for (log_folded_height, commit, step, &beta) in izip!(
+        (0..log_max_height).rev(),
+        commit_phase_commits,
+        &proof.commit_phase_openings,
+        betas,
+    ) {
+        let index_sibling = index ^ 1;
+        let index_pair = index >> 1;
+
+        let poins_leaf: PointsLeaf<F> = step.points_leaf.clone();
+        let challenge_point: Point<F> = poins_leaf.get_point_by_index(index).unwrap().clone();
+
+        let opening = reduced_openings[log_folded_height + 1];
+        folded_eval = opening + folded_eval;
+
+        if log_folded_height < log_max_height - 1 {
+            assert_eq!(folded_eval, challenge_point.y);
+        }
+        let sibling_point: Point<F> = poins_leaf
+            .get_point_by_index(index_sibling)
+            .unwrap()
+            .clone();
+
+        assert_eq!(challenge_point.x, x);
+        let neg_x = x * F::two_adic_generator(1);
+        assert_eq!(sibling_point.x, neg_x);
+
+        let mut evals = vec![folded_eval; 2];
+        evals[index_sibling % 2] = sibling_point.y;
+
+        let mut xs = vec![x; 2];
+        xs[index_sibling % 2] = neg_x;
+
+        let input = poins_leaf.signature();
+        if let TapLeaf::Script(script, _ver) = step.leaf_node.leaf().clone() {
+            // todo: check script
+            // assert_eq!(script,poins_leaf.recover_points_euqal_to_commited_point());
+            let res = execute_script_with_inputs(
+                poins_leaf.recover_points_euqal_to_commited_point(),
+                input,
+            );
+            assert_eq!(res.success, true);
+        } else {
+            panic!("Invalid script")
+        }
+
+        config
+            .mmcs
+            .verify_taptree(step, commit)
+            .map_err(FriError::CommitPhaseMmcsError)?;
+
+        folded_eval = evals[0] + (beta - xs[0]) * (evals[1] - evals[0]) / (xs[1] - xs[0]);
+
+        index = index_pair;
+        x = x.square();
+    }
+
+    debug_assert!(index < config.blowup(), "index was {}", index);
+    debug_assert_eq!(x.exp_power_of_2(config.log_blowup), F::one());
+
+    Ok(folded_eval)
+}
