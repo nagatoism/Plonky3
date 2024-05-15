@@ -58,7 +58,7 @@ impl<F: BfField> BitCommitment<F> {
             {self.commitments[F::U32_SIZE-1].recover_message_euqal_to_commit_message()}
             {self.commitments[F::U32_SIZE-1].value}
 
-            for _ in 0..F::U32_SIZE{
+            for _ in 0..(F::U32_SIZE-1){
                 OP_FROMALTSTACK
             }
             // The stake state looks like below:
@@ -97,7 +97,10 @@ impl<F: BfField> BitCommitment<F> {
         let u32_values = self.value.as_u32_vec();
         script! {
             {self.recover_message_at_stack()}
-            { u32_values[3] } { u32_values[2]} { u32_values[1] } { u32_values[0]}
+            for i in (0..F::U32_SIZE).rev(){
+                {u32_values[i]}
+            }
+          //  { u32_values[3] } { u32_values[2]} { u32_values[1] } { u32_values[0]}
             { u31ext_equalverify::<BabyBear4>() }
         }
     }
@@ -144,7 +147,6 @@ mod test {
         let a: &[F] = a.as_base_slice();
         let b: &[F] = b.as_base_slice();
         let c: &[F] = c.as_base_slice();
-
         let script = script! {
             { a[3].as_canonical_u32() } { a[2].as_canonical_u32() } { a[1].as_canonical_u32() } { a[0].as_canonical_u32() }
             { b[3].as_canonical_u32() } { b[2].as_canonical_u32() } { b[1].as_canonical_u32() } { b[0].as_canonical_u32() }
@@ -176,11 +178,11 @@ mod test {
     #[test]
     fn test_extension_bit_commit_sig_verify() {
         let mut rng = ChaCha20Rng::seed_from_u64(0u64);
-        let a = rng.gen::<EF>();
-
+        let mut a = rng.gen::<EF>();
+        a = EF::from_base_slice(vec![BabyBear::from_u32(1u32),BabyBear::from_u32(2u32),BabyBear::from_u32(3u32),BabyBear::from_u32(4u32)].as_slice());
         let a_commit = BitCommitment::new("b138982ce17ac813d505b5b40b665d404e9528e7", a);
 
-        let a: &[F] = a.as_base_slice();
+        
         let script = script! {
             {a_commit.recover_message_euqal_to_commit_message()}
             OP_1

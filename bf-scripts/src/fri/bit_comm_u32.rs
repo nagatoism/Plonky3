@@ -103,6 +103,7 @@ impl BitCommitmentU32 {
 #[cfg(test)]
 mod test {
     use p3_baby_bear::BabyBear;
+    use p3_field::PrimeField32;
     use rand::Rng;
 
     use super::*;
@@ -111,8 +112,8 @@ mod test {
 
     #[test]
     fn test_bit_commit_with_compressu32() {
-        let value = BabyBear::from_u32(0x11654321);
-        let x_commitment = BitCommitmentU32::new("0000", value.as_u32_vec()[0]);
+        let value = 0x11654321;
+        let x_commitment = BitCommitmentU32::new("0000", value);
 
         let signature = x_commitment.signature();
 
@@ -160,7 +161,7 @@ mod test {
         for _ in 0..30 {
             let mut rng = rand::thread_rng();
             let random_number: u32 = rng.gen();
-            let n = random_number % BabyBear::MOD;
+            let n = random_number % BabyBear::ORDER_U32;
 
             let x_commitment = BitCommitmentU32::new("b138982ce17ac813d505b5b40b665d404e9528e8", n);
             println!("{:?}", x_commitment.commit_u32_as_4bytes());

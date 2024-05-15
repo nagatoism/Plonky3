@@ -98,10 +98,19 @@ pub fn execute_script_with_inputs(
     .expect("error creating exec");
 
     loop {
-        if exec.exec_next().is_err() {
-            break;
+        let temp_res = exec.exec_next();
+        match temp_res{
+            Ok(())=>(),
+            Err(err)=>{
+                if err.success==false{
+                    println!("temp_res: {:?}",temp_res);
+                }
+                break;
+            }
         }
+        
     }
+    
     let res = exec.result().unwrap();
     res.clone()
 }
