@@ -1,6 +1,7 @@
 use alloc::vec;
 use alloc::vec::Vec;
 
+use bf_scripts::BfField;
 use itertools::Itertools;
 use p3_challenger::{BfGrindingChallenger, CanObserve, CanSample, GrindingChallenger};
 use p3_field::{Field, TwoAdicField};
@@ -18,8 +19,8 @@ pub fn bf_prove<F, M, Challenger>(
     challenger: &mut Challenger,
 ) -> (FriProof<F, M, Challenger::Witness>, Vec<usize>)
 where
-    F: TwoAdicField,
-    M: BFMmcs<F, Proof = BfCommitPhaseProofStep>,
+    F: BfField,
+    M: BFMmcs<F, Proof = BfCommitPhaseProofStep<F>>,
     Challenger: BfGrindingChallenger + CanObserve<M::Commitment> + CanSample<F>,
 {
     // 1. rposition start iterator from the end and calculate the valid leagth of the polynomial want commit
@@ -55,10 +56,10 @@ fn bf_answer_query<F, M>(
     config: &FriConfig<M>,
     commit_phase_commits: &[M::ProverData],
     index: usize,
-) -> BfQueryProof
+) -> BfQueryProof<F>
 where
-    F: Field,
-    M: BFMmcs<F, Proof = BfCommitPhaseProofStep>,
+    F: BfField,
+    M: BFMmcs<F, Proof = BfCommitPhaseProofStep<F>>,
 {
     let commit_phase_openings = commit_phase_commits
         .iter()
@@ -245,8 +246,20 @@ mod tests {
             .collect();
 
         // let _alpha: Challenge = challenger.sample_ext_element();
+        let v_permutation = TestPermutation {};
+        let mut v_challenger =
+            BfChallenger::<F, PF, TestPermutation, WIDTH>::new(v_permutation).unwrap();
         let fri_challenges =
-            verifier::verify_shape_and_sample_challenges(&fri_config, &proof, &mut challenger)
+            verifier::verify_shape_and_sample_challenges(&fri_config, &proof, &mut v_challenger)
                 .expect("failed verify shape and sample");
+
+        verifier::verify_challenges(&fri_config, &proof, &fri_challenges, &reduced_openings)
+            .expect("failed verify challenges");
+
+        // assert_eq!(
+        //     p_sample,
+        //     v_challenger.sample_bits(8),
+        //     "prover and verifier transcript have same state after FRI"
+        // );
     }
 }

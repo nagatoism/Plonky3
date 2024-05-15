@@ -1,7 +1,7 @@
 use alloc::vec;
 use alloc::vec::Vec;
 
-use bf_scripts::execute_script;
+use bf_scripts::{execute_script, execute_script_with_inputs, BfField, Point};
 use bitcoin::taproot::TapLeaf;
 use itertools::izip;
 use p3_challenger::{BfGrindingChallenger, CanObserve, CanSample};
@@ -31,8 +31,8 @@ pub fn verify_shape_and_sample_challenges<F, M, Challenger>(
     challenger: &mut Challenger,
 ) -> Result<FriChallenges<F>, FriError<M::Error>>
 where
-    F: Field,
-    M: BFMmcs<F, Proof = BfCommitPhaseProofStep>,
+    F: BfField,
+    M: BFMmcs<F, Proof = BfCommitPhaseProofStep<F>>,
     Challenger: BfGrindingChallenger + CanObserve<M::Commitment> + CanSample<F>,
 {
     let betas: Vec<F> = proof
@@ -74,11 +74,11 @@ pub fn verify_challenges<F, M, Witness>(
     config: &FriConfig<M>,
     proof: &FriProof<F, M, Witness>,
     challenges: &FriChallenges<F>,
-    reduced_openings: &[[&OpeningData<F>; 32]],
+    reduced_openings: &[[F ; 32]],
 ) -> Result<(), FriError<M::Error>>
 where
-    F: TwoAdicField,
-    M: BFMmcs<F, Proof = BfCommitPhaseProofStep>,
+    F: BfField,
+    M: BFMmcs<F, Proof = BfCommitPhaseProofStep<F>>,
 {
     let log_max_height = proof.commit_phase_commits.len() + config.log_blowup;
     for (&index, query_proof, ro) in izip!(
@@ -108,20 +108,18 @@ fn verify_query<F, M>(
     config: &FriConfig<M>,
     commit_phase_commits: &[M::Commitment],
     mut index: usize,
-    proof: &BfQueryProof,
+    proof: &BfQueryProof<F>,
     betas: &[F],
-    reduced_openings: &[&OpeningData<F>; 32],
+    reduced_openings: &[F; 32],
     log_max_height: usize,
 ) -> Result<F, FriError<M::Error>>
 where
-    F: TwoAdicField,
-    M: BFMmcs<F, Proof = BfCommitPhaseProofStep>,
+    F: BfField,
+    M: BFMmcs<F, Proof = BfCommitPhaseProofStep<F>>,
 {
     let mut folded_eval = F::zero();
-    let mut r = F::zero();
-    let mut y_r = F::zero();
-    let mut neg_r = F::zero();
-    let mut y_neg_r = F::zero();
+    let mut x = F::zero();
+    let mut neg_x = F::zero();
 
     let mut x = F::two_adic_generator(log_max_height)
         .exp_u64(reverse_bits_len(index, log_max_height) as u64);
@@ -135,29 +133,32 @@ where
         let index_sibling = index ^ 1;
         let index_pair = index >> 1;
 
-        let opening = reduced_openings[log_folded_height + 1];
-        assert_eq!(opening.leaf_index, index);
-        assert_eq!(opening.sibling_leaf_index, index_sibling);
+        let challenge_point :Point<F> = step.leaf.get_point_by_index(index).unwrap().clone();
+        if log_folded_height < log_max_height-1 {
+            assert_eq!(folded_eval, challenge_point.y);
+        }
+        let sibling_point :Point<F>= step.leaf.get_point_by_index(index_sibling).unwrap().clone();
+        
+        // let opening = reduced_openings[log_folded_height + 1];
 
-        // Todo: get x p(x) -x p(-x) value
-        r = x;
-        neg_r = x * F::two_adic_generator(1);
-        assert_eq!(y_r, opening.value);
-        // y_r = opening.value;
-        y_neg_r = opening.sibling_value;
+        assert_eq!(challenge_point.x, x);
+        neg_x = x * F::two_adic_generator(1);
+        assert_eq!(sibling_point.x,neg_x);
+    
 
-        let mut evals = vec![y_r; 2];
-        evals[index_sibling % 2] = y_neg_r;
+        let mut evals = vec![challenge_point.y; 2];
+        evals[index_sibling % 2] = sibling_point.y;
 
-        let mut xs = vec![r; 2];
-        xs[index_sibling % 2] = neg_r;
+        let mut xs = vec![x; 2];
+        xs[index_sibling % 2] = neg_x;
 
+        let input = step.leaf.signature();
         if let TapLeaf::Script(script, _ver) = step.leaf_node.clone() {
             // Todo: Execute the script with input
-            let res = execute_script(script);
+            let res = execute_script_with_inputs(script,input);
             assert_eq!(res.success, true);
         } else {
-            // None
+            panic!("Invalid script")
         }
 
         config
@@ -165,7 +166,7 @@ where
             .verify_taptree(step, commit)
             .map_err(FriError::CommitPhaseMmcsError)?;
 
-        y_r = evals[0] + (beta - xs[0]) * (evals[1] - evals[0]) / (xs[1] - xs[0]);
+        folded_eval = evals[0] + (beta - xs[0]) * (evals[1] - evals[0]) / (xs[1] - xs[0]);
 
         index = index_pair;
         x = x.square();

@@ -31,28 +31,31 @@ impl<F> TapTreeMmcs<F> {
     }
 }
 impl<F: BfField> BFMmcs<F> for TapTreeMmcs<F> {
-    type ProverData = PolyCommitTree<1>;
-    type Proof = BfCommitPhaseProofStep;
+    type ProverData = PolyCommitTree<F,1>;
+    type Proof = BfCommitPhaseProofStep<F>;
     type Commitment = TreeRoot;
     type Error = BfError;
 
-    fn open_taptree(&self, index: usize, prover_data: &PolyCommitTree<1>) -> Self::Proof {
+    fn open_taptree(&self, index: usize, prover_data: &PolyCommitTree<F,1>) -> Self::Proof {
         // The matrix with width-2 lead to the index need to right shift 1-bit
-        let leaf = prover_data.get_leaf(index >> LOG_DEFAULT_MATRIX_WIDTH);
+        let leaf_index = index >> LOG_DEFAULT_MATRIX_WIDTH;
+        let leaf = prover_data.get_leaf(leaf_index);
         let opening_leaf = match leaf {
             Some(v) => v,
             None => {
-                println!(
-                    "leaf index:{:?}, leaf count:{:?}",
-                    index,
-                    prover_data.leaf_count()
-                );
+                // println!(
+                //     "leaf index:{:?}, leaf count:{:?}",
+                //     index,
+                //     prover_data.leaf_count()
+                // );
                 panic!("invalid leaf index")
             }
         };
         let merkle_branch = opening_leaf.merkle_branch().clone();
         let leaf = opening_leaf.leaf().clone();
+        let input = prover_data.get_points_leaf(leaf_index).clone();
         BfCommitPhaseProofStep {
+            leaf:input,
             leaf_node: leaf,
             merkle_branch: merkle_branch,
         }
@@ -79,7 +82,7 @@ impl<F: BfField> BFMmcs<F> for TapTreeMmcs<F> {
 
     fn commit(&self, inputs: Vec<RowMajorMatrix<F>>) -> (Self::Commitment, Self::ProverData) {
         let log_leaves = log2_strict_usize(inputs[0].height());
-        let mut tree = PolyCommitTree::<1>::new(log_leaves);
+        let mut tree = PolyCommitTree::<F,1>::new(log_leaves);
 
         tree.commit_rev_points(inputs[0].values.clone(), inputs[0].width);
         let root: U256 = tree.root().node_hash().as_byte_array().clone();

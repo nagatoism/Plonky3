@@ -3,8 +3,7 @@ use std::hash::Hash;
 pub use p3_baby_bear::BabyBear;
 use p3_field::extension::BinomialExtensionField;
 use p3_field::{
-    AbstractExtensionField, AbstractField, ExtensionField, PackedValue, PrimeField, PrimeField32,
-    TwoAdicField,
+    AbstractExtensionField, AbstractField, ExtensionField, PackedValue, PrimeField, PrimeField32, TwoAdicField
 };
 use rand::Rng;
 

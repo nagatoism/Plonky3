@@ -49,15 +49,21 @@ impl<const NUM_POLY: usize> Deref for FoldingTree<NUM_POLY> {
 
 // =============== Polycommitment Tree ===============
 
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
-pub struct PolyCommitTree<const NUM_POLY: usize>(pub BasicTree<NUM_POLY>);
+#[derive(Clone, Debug)]
+pub struct PolyCommitTree<F:BfField,const NUM_POLY: usize>{
+    pub tree:BasicTree<NUM_POLY>,
+    pub points_leafs: Vec<PointsLeaf<F>>,
+}
 
-impl<const NUM_POLY: usize> PolyCommitTree<NUM_POLY> {
+impl<const NUM_POLY: usize,F:BfField> PolyCommitTree<F,NUM_POLY> {
     pub fn new(log_poly_points: usize) -> Self {
-        Self(BasicTree::new(log_poly_points))
+        Self{
+            tree:BasicTree::<NUM_POLY>::new(log_poly_points),
+            points_leafs:Vec::new(),
+        }
     }
 
-    pub fn commit_points<F: BfField>(&mut self, evaluations: Vec<F>) {
+    pub fn commit_points(&mut self, evaluations: Vec<F>) {
         let poly_points = evaluations.len();
         let evas = Polynomials::new_eva_poly(
             evaluations,
@@ -72,18 +78,18 @@ impl<const NUM_POLY: usize> PolyCommitTree<NUM_POLY> {
                 vec![evas.values[i].clone()],
             )
             .unwrap();
-            self.0.add_leaf(leaf_script);
+            self.tree.add_leaf(leaf_script);
         }
 
-        self.0.finalize();
+        self.tree.finalize();
     }
 
-    pub fn commit_rev_points<F: BfField>(&mut self, evaluations: Vec<F>, width: usize) {
+    pub fn commit_rev_points(&mut self, evaluations: Vec<F>, width: usize) {
         let poly_points = evaluations.len();
         let mut subgroup = F::sub_group(log2_strict_usize(poly_points));
         let mut leaf_indexs: Vec<usize> = (0..poly_points).into_iter().collect();
         reverse_slice_index_bits(&mut subgroup);
-        reverse_slice_index_bits(&mut leaf_indexs);
+        // reverse_slice_index_bits(&mut leaf_indexs);
 
         for i in (0..poly_points).into_iter().step_by(width) {
             let leaf = PointsLeaf::new(
@@ -94,25 +100,34 @@ impl<const NUM_POLY: usize> PolyCommitTree<NUM_POLY> {
                 subgroup[i + 1],
                 evaluations[i + 1],
             );
-            self.0
+            self.points_leafs.push(leaf.clone());
+            self.tree
                 .add_leaf(leaf.recover_points_euqal_to_commited_point());
         }
 
-        self.0.finalize();
+        self.tree.finalize();
+    }
+
+    pub fn get_points_leafs(&self) -> &[PointsLeaf<F>] {
+        &self.points_leafs
+    }
+
+    pub fn get_points_leaf(&self,index:usize) -> &PointsLeaf<F> {
+        &self.points_leafs[index]
     }
 }
 
-impl<const NUM_POLY: usize> Deref for PolyCommitTree<NUM_POLY> {
+impl<const NUM_POLY: usize,F:BfField> Deref for PolyCommitTree<F,NUM_POLY> {
     type Target = BasicTree<NUM_POLY>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.tree
     }
 }
 
-impl<const NUM_POLY: usize> DerefMut for PolyCommitTree<NUM_POLY> {
+impl<const NUM_POLY: usize,F:BfField> DerefMut for PolyCommitTree<F,NUM_POLY> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.tree
     }
 }
 
@@ -384,7 +399,7 @@ mod tests {
         let eva_poly1 = poly1.convert_to_evals_at_subgroup();
         let evas1 = eva_poly1.values();
 
-        let mut field_taptree_1 = PolyCommitTree::<1>::new(2);
+        let mut field_taptree_1 = PolyCommitTree::<BabyBear,1>::new(2);
 
         for i in 0..evas1.len() {
             let leaf_script = construct_evaluation_leaf_script::<1, F>(
@@ -414,7 +429,7 @@ mod tests {
             assert_eq!(inclusion, true);
         });
 
-        let mut field_taptree_2 = PolyCommitTree::<1>::new(2);
+        let mut field_taptree_2 = PolyCommitTree::<BabyBear,1>::new(2);
 
         for i in 0..evas2.len() {
             let leaf_script = construct_evaluation_leaf_script::<1, F>(
