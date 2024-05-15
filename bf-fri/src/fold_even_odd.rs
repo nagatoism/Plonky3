@@ -54,7 +54,7 @@ pub fn fold_even_odd<F: TwoAdicField>(poly: Vec<F>, beta: F) -> Vec<F> {
 #[cfg(test)]
 mod tests {
 
-    use bf_scripts::{execute_script, ext_fold_degree, ext_fold_degree1, BabyBear4, BfField};
+    use bf_scripts::{execute_script, ext_fold_degree1, BabyBear4, BfField};
     use itertools::izip;
     use p3_baby_bear::BabyBear;
     use p3_dft::{Radix2Dit, TwoAdicSubgroupDft};
@@ -140,7 +140,7 @@ mod tests {
         let log_n = 4;
         let n = 1 << log_n;
         let coeffs = (0..n)
-            .map(|i: u32| F::from_base_fn(|i| rng.gen::<F>()))
+            .map(|i: u32| F::from_base_fn(|_i| rng.gen::<F>()))
             .collect::<Vec<_>>();
 
         let dft = Radix2Dit::default();
@@ -169,7 +169,7 @@ mod tests {
 
         assert_eq!(expected, folded);
 
-        for (index, log_n) in vec![4].iter().enumerate() {
+        for (_index, log_n) in vec![4].iter().enumerate() {
             let n = 1 << log_n;
             let y0 = evals.clone();
             let y1 = expected.clone();

@@ -7,7 +7,7 @@ use super::bit_comm::*;
 use crate::{BCAssignment, BfField};
 define_pushable!();
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct PointsLeaf<F: BfField> {
     leaf_index_1: usize,
     leaf_index_2: usize,
@@ -47,18 +47,18 @@ impl<F: BfField> PointsLeaf<F> {
         p2_sigs
     }
 
-    pub fn get_point_by_index(&self, index: usize) -> Option<&Point<F>>{
+    pub fn get_point_by_index(&self, index: usize) -> Option<&Point<F>> {
         if index == self.leaf_index_1 {
             Some(&self.points.p1)
-        }else if self.leaf_index_2 == index {
+        } else if self.leaf_index_2 == index {
             Some(&self.points.p2)
-        }else {
+        } else {
             None
         }
     }
 }
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct Points<F: BfField> {
     p1: Point<F>,
     p2: Point<F>,
@@ -87,7 +87,7 @@ impl<F: BfField> Points<F> {
     }
 }
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct Point<F: BfField> {
     pub x: F,
     pub y: F,

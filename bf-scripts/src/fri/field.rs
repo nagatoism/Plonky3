@@ -1,10 +1,6 @@
-use std::hash::Hash;
-
 pub use p3_baby_bear::BabyBear;
 use p3_field::extension::BinomialExtensionField;
-use p3_field::{
-    AbstractExtensionField, AbstractField, ExtensionField, PackedValue, PrimeField, PrimeField32, TwoAdicField
-};
+use p3_field::{AbstractExtensionField, AbstractField, PrimeField32, TwoAdicField};
 use rand::Rng;
 
 pub trait BfField: AbstractField + TwoAdicField + Clone + Copy {
@@ -26,7 +22,7 @@ pub trait BfField: AbstractField + TwoAdicField + Clone + Copy {
         let mut subgroups = Vec::new();
         let mut acc = generator;
         subgroups.push(Self::one());
-        for i in 0..group_size - 1 {
+        for _ in 0..group_size - 1 {
             subgroups.push(acc);
             acc = acc * generator;
         }
@@ -68,7 +64,6 @@ impl BfField for BinomialExtensionField<BabyBear, 4> {
 }
 
 mod tests {
-    use super::*;
     #[test]
     fn test_subgroup() {
         let generator = BabyBear::group_genreator(2);

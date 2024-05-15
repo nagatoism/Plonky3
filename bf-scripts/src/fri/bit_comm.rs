@@ -1,9 +1,8 @@
 use bitcoin::ScriptBuf as Script;
 use bitcoin_script::{define_pushable, script};
 use itertools::Itertools;
-use p3_field::ExtensionField;
 
-use super::bit_comm_u32::{BitCommitmentU32, *};
+use super::bit_comm_u32::*;
 use crate::fri::field::*;
 use crate::{u31ext_equalverify, BabyBear4};
 define_pushable!();
@@ -24,7 +23,7 @@ impl<F: BfField> BitCommitment<F> {
         Self { value, commitments }
     }
 
-    pub fn message_TOALTSTACK(&self) -> Script {
+    pub fn message_to_altstack(&self) -> Script {
         script! {
             for _ in 0..F::U32_SIZE{
                 OP_TOALTSTACK
@@ -32,7 +31,7 @@ impl<F: BfField> BitCommitment<F> {
         }
     }
 
-    pub fn message_FROMALTSTACK(&self) -> Script {
+    pub fn message_from_altstack(&self) -> Script {
         script! {
             for _ in 0..F::U32_SIZE{
                 OP_FROMALTSTACK
@@ -161,8 +160,8 @@ mod test {
         let script = script! {
             { a_commit.recover_message_at_altstack() }
             { b_commit.recover_message_at_altstack() }
-            { b_commit.message_FROMALTSTACK()}
-            { a_commit.message_FROMALTSTACK()}
+            { b_commit.message_from_altstack()}
+            { a_commit.message_from_altstack()}
             { u31ext_add::<BabyBear4>() }
             { c[3].as_canonical_u32() } { c[2].as_canonical_u32() } { c[1].as_canonical_u32() } { c[0].as_canonical_u32() }
             { u31ext_equalverify::<BabyBear4>() }
@@ -179,10 +178,17 @@ mod test {
     fn test_extension_bit_commit_sig_verify() {
         let mut rng = ChaCha20Rng::seed_from_u64(0u64);
         let mut a = rng.gen::<EF>();
-        a = EF::from_base_slice(vec![BabyBear::from_u32(1u32),BabyBear::from_u32(2u32),BabyBear::from_u32(3u32),BabyBear::from_u32(4u32)].as_slice());
+        a = EF::from_base_slice(
+            vec![
+                BabyBear::from_u32(1u32),
+                BabyBear::from_u32(2u32),
+                BabyBear::from_u32(3u32),
+                BabyBear::from_u32(4u32),
+            ]
+            .as_slice(),
+        );
         let a_commit = BitCommitment::new("b138982ce17ac813d505b5b40b665d404e9528e7", a);
 
-        
         let script = script! {
             {a_commit.recover_message_euqal_to_commit_message()}
             OP_1

@@ -5,7 +5,7 @@ use core::usize;
 
 use bf_scripts::{BfField, EvaluationLeaf, PointsLeaf};
 use bitcoin::taproot::LeafVersion::TapScript;
-use bitcoin::taproot::{LeafNode, LeafNodes, NodeInfo, TapTree, TaprootMerkleBranch};
+use bitcoin::taproot::{LeafNode, LeafNodes, NodeInfo, TaprootMerkleBranch};
 use bitcoin::{ScriptBuf, TapNodeHash};
 use p3_util::{log2_strict_usize, reverse_slice_index_bits};
 
@@ -30,36 +30,19 @@ pub fn construct_evaluation_leaf_script<const NUM_POLY: usize, F: BfField>(
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub struct GlobalTree {}
 
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
-pub struct FoldingTree<const NUM_POLY: usize>(pub BasicTree<NUM_POLY>);
-
-impl<const NUM_POLY: usize> FoldingTree<NUM_POLY> {
-    fn new(log_poly_points: usize) -> Self {
-        Self(BasicTree::new(log_poly_points))
-    }
-}
-
-impl<const NUM_POLY: usize> Deref for FoldingTree<NUM_POLY> {
-    type Target = BasicTree<NUM_POLY>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
 // =============== Polycommitment Tree ===============
 
 #[derive(Clone, Debug)]
-pub struct PolyCommitTree<F:BfField,const NUM_POLY: usize>{
-    pub tree:BasicTree<NUM_POLY>,
+pub struct PolyCommitTree<F: BfField, const NUM_POLY: usize> {
+    pub tree: BasicTree<NUM_POLY>,
     pub points_leafs: Vec<PointsLeaf<F>>,
 }
 
-impl<const NUM_POLY: usize,F:BfField> PolyCommitTree<F,NUM_POLY> {
+impl<const NUM_POLY: usize, F: BfField> PolyCommitTree<F, NUM_POLY> {
     pub fn new(log_poly_points: usize) -> Self {
-        Self{
-            tree:BasicTree::<NUM_POLY>::new(log_poly_points),
-            points_leafs:Vec::new(),
+        Self {
+            tree: BasicTree::<NUM_POLY>::new(log_poly_points),
+            points_leafs: Vec::new(),
         }
     }
 
@@ -87,9 +70,8 @@ impl<const NUM_POLY: usize,F:BfField> PolyCommitTree<F,NUM_POLY> {
     pub fn commit_rev_points(&mut self, evaluations: Vec<F>, width: usize) {
         let poly_points = evaluations.len();
         let mut subgroup = F::sub_group(log2_strict_usize(poly_points));
-        let mut leaf_indexs: Vec<usize> = (0..poly_points).into_iter().collect();
+        let leaf_indexs: Vec<usize> = (0..poly_points).into_iter().collect();
         reverse_slice_index_bits(&mut subgroup);
-        // reverse_slice_index_bits(&mut leaf_indexs);
 
         for i in (0..poly_points).into_iter().step_by(width) {
             let leaf = PointsLeaf::new(
@@ -100,24 +82,28 @@ impl<const NUM_POLY: usize,F:BfField> PolyCommitTree<F,NUM_POLY> {
                 subgroup[i + 1],
                 evaluations[i + 1],
             );
-            self.points_leafs.push(leaf.clone());
-            self.tree
-                .add_leaf(leaf.recover_points_euqal_to_commited_point());
+            self.add_leaf(&leaf);
         }
 
         self.tree.finalize();
+    }
+
+    pub fn add_leaf(&mut self, leaf: &PointsLeaf<F>) {
+        self.points_leafs.push(leaf.clone());
+        self.tree
+            .add_leaf(leaf.recover_points_euqal_to_commited_point());
     }
 
     pub fn get_points_leafs(&self) -> &[PointsLeaf<F>] {
         &self.points_leafs
     }
 
-    pub fn get_points_leaf(&self,index:usize) -> &PointsLeaf<F> {
+    pub fn get_points_leaf(&self, index: usize) -> &PointsLeaf<F> {
         &self.points_leafs[index]
     }
 }
 
-impl<const NUM_POLY: usize,F:BfField> Deref for PolyCommitTree<F,NUM_POLY> {
+impl<const NUM_POLY: usize, F: BfField> Deref for PolyCommitTree<F, NUM_POLY> {
     type Target = BasicTree<NUM_POLY>;
 
     fn deref(&self) -> &Self::Target {
@@ -125,7 +111,7 @@ impl<const NUM_POLY: usize,F:BfField> Deref for PolyCommitTree<F,NUM_POLY> {
     }
 }
 
-impl<const NUM_POLY: usize,F:BfField> DerefMut for PolyCommitTree<F,NUM_POLY> {
+impl<const NUM_POLY: usize, F: BfField> DerefMut for PolyCommitTree<F, NUM_POLY> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.tree
     }
@@ -217,7 +203,7 @@ impl<const NUM_POLY: usize> BasicTree<NUM_POLY> {
         self.leaves().nth(index)
     }
 
-    pub fn verify_inclusion(&self, index: usize) -> bool {
+    pub fn verify_inclusion_by_index(&self, index: usize) -> bool {
         let leaf = self.get_leaf(index).unwrap();
         let path = self.get_leaf_merkle_path(index).unwrap();
         let mut first_node_hash = TapNodeHash::from_node_hashes(leaf.node_hash(), path[0]);
@@ -237,6 +223,16 @@ impl<const NUM_POLY: usize> From<NodeInfo> for BasicTree<NUM_POLY> {
             tree_builder: None,
         }
     }
+}
+
+pub fn verify_inclusion(root: TapNodeHash, leaf: &LeafNode) -> bool {
+    let path = leaf.merkle_branch();
+    let mut first_node_hash = TapNodeHash::from_node_hashes(leaf.node_hash(), path[0]);
+    path[1..].into_iter().for_each(|sibling_node| {
+        first_node_hash = TapNodeHash::from_node_hashes(first_node_hash, *sibling_node);
+    });
+
+    first_node_hash == root
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
@@ -339,14 +335,7 @@ impl<F: BfField> Polynomials<F> {
 
 mod tests {
 
-    use alloc::vec;
-
-    use bf_scripts::BabyBear;
     use p3_field::AbstractField;
-    use p3_interpolation::interpolate_subgroup;
-    use p3_matrix::dense::RowMajorMatrix;
-
-    use super::*;
 
     #[test]
     fn test_tree_builder() {
@@ -399,7 +388,7 @@ mod tests {
         let eva_poly1 = poly1.convert_to_evals_at_subgroup();
         let evas1 = eva_poly1.values();
 
-        let mut field_taptree_1 = PolyCommitTree::<BabyBear,1>::new(2);
+        let mut field_taptree_1 = PolyCommitTree::<BabyBear, 1>::new(2);
 
         for i in 0..evas1.len() {
             let leaf_script = construct_evaluation_leaf_script::<1, F>(
@@ -408,7 +397,7 @@ mod tests {
                 vec![evas1[i].clone()],
             )
             .unwrap();
-            field_taptree_1.add_leaf(leaf_script);
+            field_taptree_1.tree.add_leaf(leaf_script);
         }
 
         let coeffs2: Vec<BabyBear> = vec![
@@ -425,11 +414,16 @@ mod tests {
         field_taptree_1.finalize();
 
         (0..4).into_iter().for_each(|index| {
-            let inclusion = field_taptree_1.verify_inclusion(index);
+            let inclusion = field_taptree_1.verify_inclusion_by_index(index);
             assert_eq!(inclusion, true);
+            let success = verify_inclusion(
+                field_taptree_1.root().node_hash(),
+                field_taptree_1.get_leaf(index).unwrap(),
+            );
+            assert_eq!(success, true);
         });
 
-        let mut field_taptree_2 = PolyCommitTree::<BabyBear,1>::new(2);
+        let mut field_taptree_2 = PolyCommitTree::<BabyBear, 1>::new(2);
 
         for i in 0..evas2.len() {
             let leaf_script = construct_evaluation_leaf_script::<1, F>(
@@ -438,12 +432,12 @@ mod tests {
                 vec![evas2[i].clone()],
             )
             .unwrap();
-            field_taptree_2.add_leaf(leaf_script);
+            field_taptree_2.tree.add_leaf(leaf_script);
         }
 
         field_taptree_2.finalize();
         (0..4).into_iter().for_each(|index| {
-            let inclusion = field_taptree_2.verify_inclusion(index);
+            let inclusion = field_taptree_2.verify_inclusion_by_index(index);
             assert_eq!(inclusion, true);
         });
 
@@ -456,7 +450,7 @@ mod tests {
         );
 
         (0..8).into_iter().for_each(|index| {
-            let inclusion = combined_tree.verify_inclusion(index);
+            let inclusion = combined_tree.verify_inclusion_by_index(index);
             assert_eq!(inclusion, true);
         });
 
@@ -464,5 +458,65 @@ mod tests {
             combined_tree.get_leaf(0).unwrap().leaf_hash(),
             field_taptree_1.get_leaf(0).unwrap().leaf_hash()
         );
+    }
+
+    #[test]
+    fn test_poly_add_leaf() {
+        // x^2 + 2 x + 3
+        type F = BabyBear;
+        let evals = [
+            6, 886605102, 1443543107, 708307799, 2, 556938009, 569722818, 1874680944,
+        ]
+        .map(F::from_canonical_u32);
+        let evals_mat = RowMajorMatrix::new(evals.to_vec(), 1);
+
+        let point = F::from_canonical_u32(100);
+        let result = interpolate_subgroup(&evals_mat, point);
+        assert_eq!(result, vec![F::from_canonical_u32(10203)]);
+
+        let coeffs1: Vec<BabyBear> = vec![
+            BabyBear::from_canonical_u32(1),
+            BabyBear::from_canonical_u32(2),
+            BabyBear::from_canonical_u32(3),
+            BabyBear::from_canonical_u32(4),
+        ];
+        let poly1 = Polynomials::new(coeffs1, PolynomialType::Coeff);
+        let eva_poly1 = poly1.convert_to_evals_at_subgroup();
+        let evas1 = eva_poly1.values();
+
+        let mut field_taptree_1 = PolyCommitTree::<BabyBear, 1>::new(2);
+
+        for i in 0..evas1.len() {
+            let leaf_script = construct_evaluation_leaf_script::<1, F>(
+                i,
+                eva_poly1.points[i],
+                vec![evas1[i].clone()],
+            )
+            .unwrap();
+            field_taptree_1.tree.add_leaf(leaf_script);
+        }
+
+        let coeffs2: Vec<BabyBear> = vec![
+            BabyBear::from_canonical_u32(4),
+            BabyBear::from_canonical_u32(3),
+            BabyBear::from_canonical_u32(2),
+            BabyBear::from_canonical_u32(1),
+        ];
+        let poly2 = Polynomials::new(coeffs2, PolynomialType::Coeff);
+        let eva_poly2 = poly2.convert_to_evals_at_subgroup();
+        let evas2 = eva_poly2.values();
+        assert!(evas2.len() == 4);
+
+        field_taptree_1.finalize();
+
+        (0..4).into_iter().for_each(|index| {
+            let inclusion = field_taptree_1.verify_inclusion_by_index(index);
+            assert_eq!(inclusion, true);
+            let success = verify_inclusion(
+                field_taptree_1.root().node_hash(),
+                field_taptree_1.get_leaf(index).unwrap(),
+            );
+            assert_eq!(success, true);
+        });
     }
 }

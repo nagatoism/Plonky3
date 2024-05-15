@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use bitcoin::ScriptBuf as Script;
 use bitcoin_script::{define_pushable, script};
 

@@ -1,7 +1,6 @@
-use bitcoin::opcodes::OP_FROMALTSTACK;
 use bitcoin::ScriptBuf as Script;
 use bitcoin_script::script;
-use p3_field::{AbstractField, PrimeField, PrimeField32};
+use p3_field::PrimeField32;
 
 use crate::{pushable, unroll};
 
@@ -115,7 +114,7 @@ pub fn ext_fold_degree1<M: U31ExtConfig, F: PrimeField32>(
 // y_0(-r)= g_0,1(r^2) -r g_0,2(r^2)
 // y_1(r^2) = g_0,1(r^2) + v_0 g_0,2(r^2)
 pub fn ext_fold_degree<M: U31ExtConfig>(
-    degree: u32,
+    _degree: u32,
     x: &[u32],
     y_0_x: &[u32],
     y_0_neg_x: &[u32],
@@ -138,7 +137,7 @@ pub fn ext_fold_degree<M: U31ExtConfig>(
         }
         { u31ext_mul::<M>()}
 
-        for _ in (0..M::DEGREE){
+        for _ in 0..M::DEGREE{
             OP_TOALTSTACK
         }
 
@@ -156,12 +155,12 @@ pub fn ext_fold_degree<M: U31ExtConfig>(
         }
         {u31ext_mul::<M>()}
         // calaulate (2 * r * beta * g_0,2(r^2)) + (2 * r * g_0,1(r^2))
-        for _ in (0..M::DEGREE){
+        for _ in 0..M::DEGREE{
             OP_FROMALTSTACK
         }
 
         { u31ext_add::<M>() }
-        for _ in (0..M::DEGREE){
+        for _ in 0..M::DEGREE{
             OP_TOALTSTACK
         }
 
@@ -179,7 +178,7 @@ pub fn ext_fold_degree<M: U31ExtConfig>(
         // Check Equal
         // y_1(r^2) = g_0,1(r^2) + beta g_0,2(r^2)
         // 2r y_1(r^2) = 2r g_0,1(r^2) + 2r beta g_0,2(r^2)
-       for _ in (0..M::DEGREE){
+       for _ in 0..M::DEGREE{
             OP_FROMALTSTACK
         }
 

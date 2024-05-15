@@ -120,7 +120,7 @@ where
 
         self.input_buffer.push(value);
 
-        if self.input_buffer.len() == WIDTH/2 {
+        if self.input_buffer.len() == WIDTH / 2 {
             self.duplexing();
         }
     }

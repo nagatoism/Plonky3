@@ -2,7 +2,7 @@
 use bitcoin::blockdata::transaction;
 use bitcoin::blockdata::transaction::Transaction;
 use bitcoin::hashes::Hash;
-use bitcoin::{TapLeafHash, Transaction as TX};
+use bitcoin::TapLeafHash;
 use bitcoin_script::define_pushable;
 use bitcoin_scriptexec::{Exec, ExecCtx, ExecutionResult, Options, TxTemplate};
 mod u31;
@@ -99,18 +99,17 @@ pub fn execute_script_with_inputs(
 
     loop {
         let temp_res = exec.exec_next();
-        match temp_res{
-            Ok(())=>(),
-            Err(err)=>{
-                if err.success==false{
-                    println!("temp_res: {:?}",temp_res);
+        match temp_res {
+            Ok(()) => (),
+            Err(err) => {
+                if err.success == false {
+                    println!("temp_res: {:?}", temp_res);
                 }
                 break;
             }
         }
-        
     }
-    
+
     let res = exec.result().unwrap();
     res.clone()
 }

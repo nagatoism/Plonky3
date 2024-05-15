@@ -2,9 +2,8 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use bf_scripts::BfField;
-use itertools::Itertools;
-use p3_challenger::{BfGrindingChallenger, CanObserve, CanSample, GrindingChallenger};
-use p3_field::{Field, TwoAdicField};
+use p3_challenger::{BfGrindingChallenger, CanObserve, CanSample};
+use p3_field::TwoAdicField;
 use p3_matrix::dense::RowMajorMatrix;
 use tracing::{info_span, instrument};
 
@@ -136,18 +135,18 @@ struct CommitPhaseResult<F: Send + Sync, M: BFMmcs<F>> {
 mod tests {
 
     use bf_scripts::BabyBear;
-    use p3_challenger::{BfChallenger, BfGrindingChallenger};
+    use p3_challenger::BfChallenger;
     use p3_dft::{Radix2Dit, TwoAdicSubgroupDft};
-    use p3_field::{AbstractField, PrimeField64, U32};
+    use p3_field::{AbstractField, U32};
     use p3_matrix::util::reverse_matrix_index_bits;
     use p3_matrix::Matrix;
     use p3_symmetric::{CryptographicPermutation, Permutation};
     use p3_util::log2_strict_usize;
-    use rand::{Rng, SeedableRng};
+    use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
 
     use super::*;
-    use crate::mmcs::taptree_mmcs::{TreeRoot, ROOT_WIDTH};
+    use crate::mmcs::taptree_mmcs::ROOT_WIDTH;
     use crate::taptree_mmcs::TapTreeMmcs;
     use crate::verifier;
 

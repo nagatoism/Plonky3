@@ -1,10 +1,8 @@
 use std::usize;
 
-use bitcoin::opcodes::{OP_ADD, OP_FROMALTSTACK, OP_LSHIFT, OP_SWAP, OP_TOALTSTACK};
 use bitcoin::ScriptBuf as Script;
 use bitcoin_script::script;
 
-use crate::fri::BfField;
 use crate::{pushable, unroll};
 mod m31;
 pub use m31::*;
@@ -128,7 +126,7 @@ pub fn convert_digits_to_u32<const DIGITS_BITSIZE: usize, const DIGITS_NUM: usiz
 // y_0(-r)= g_0,1(r^2) -r g_0,2(r^2)
 // y_1(r^2) = g_0,1(r^2) + v_0 g_0,2(r^2)
 pub fn fold_degree<M: U31Config>(
-    degree: u32,
+    _degree: u32,
     x: u32,
     y_0_x: u32,
     y_0_neg_x: u32,

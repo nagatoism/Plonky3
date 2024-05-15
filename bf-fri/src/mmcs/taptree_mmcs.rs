@@ -5,15 +5,15 @@ use core::{panic, usize};
 use bf_scripts::BfField;
 use bitcoin::hashes::Hash as Bitcoin_HASH;
 use bitcoin::TapNodeHash;
-use p3_field::{u256_to_u32, u32_to_u256, PermutationField, U256, U32};
-use p3_matrix::dense::{RowMajorMatrix, RowMajorMatrixView};
-use p3_matrix::{Dimensions, Matrix};
+use p3_field::{u256_to_u32, u32_to_u256, U256, U32};
+use p3_matrix::dense::RowMajorMatrix;
+use p3_matrix::Matrix;
 use p3_util::log2_strict_usize;
 
 use super::bf_mmcs::BFMmcs;
 use crate::error::BfError;
 use crate::prover::LOG_DEFAULT_MATRIX_WIDTH;
-use crate::taptree::PolyCommitTree;
+use crate::taptree::{verify_inclusion, PolyCommitTree};
 use crate::BfCommitPhaseProofStep;
 
 pub type TreeRoot = [U32; ROOT_WIDTH];
@@ -31,12 +31,12 @@ impl<F> TapTreeMmcs<F> {
     }
 }
 impl<F: BfField> BFMmcs<F> for TapTreeMmcs<F> {
-    type ProverData = PolyCommitTree<F,1>;
+    type ProverData = PolyCommitTree<F, 1>;
     type Proof = BfCommitPhaseProofStep<F>;
     type Commitment = TreeRoot;
     type Error = BfError;
 
-    fn open_taptree(&self, index: usize, prover_data: &PolyCommitTree<F,1>) -> Self::Proof {
+    fn open_taptree(&self, index: usize, prover_data: &PolyCommitTree<F, 1>) -> Self::Proof {
         // The matrix with width-2 lead to the index need to right shift 1-bit
         let leaf_index = index >> LOG_DEFAULT_MATRIX_WIDTH;
         let leaf = prover_data.get_leaf(leaf_index);
@@ -51,13 +51,10 @@ impl<F: BfField> BFMmcs<F> for TapTreeMmcs<F> {
                 panic!("invalid leaf index")
             }
         };
-        let merkle_branch = opening_leaf.merkle_branch().clone();
-        let leaf = opening_leaf.leaf().clone();
         let input = prover_data.get_points_leaf(leaf_index).clone();
         BfCommitPhaseProofStep {
-            leaf:input,
-            leaf_node: leaf,
-            merkle_branch: merkle_branch,
+            points_leaf: input,
+            leaf_node: opening_leaf.clone(),
         }
     }
 
@@ -67,13 +64,8 @@ impl<F: BfField> BFMmcs<F> for TapTreeMmcs<F> {
         root: &Self::Commitment,
     ) -> Result<(), Self::Error> {
         let root_node = TapNodeHash::from_byte_array(u32_to_u256(root.clone()));
-        let mut first_node_hash = TapNodeHash::from_node_hashes(root_node, proof.merkle_branch[0]);
-        proof.merkle_branch[1..]
-            .into_iter()
-            .for_each(|sibling_node| {
-                first_node_hash = TapNodeHash::from_node_hashes(first_node_hash, *sibling_node);
-            });
-        if root_node == first_node_hash {
+        let success = verify_inclusion(root_node, &proof.leaf_node);
+        if success {
             Ok(())
         } else {
             Err(BfError::InvalidMerkleProof)
@@ -82,7 +74,7 @@ impl<F: BfField> BFMmcs<F> for TapTreeMmcs<F> {
 
     fn commit(&self, inputs: Vec<RowMajorMatrix<F>>) -> (Self::Commitment, Self::ProverData) {
         let log_leaves = log2_strict_usize(inputs[0].height());
-        let mut tree = PolyCommitTree::<F,1>::new(log_leaves);
+        let mut tree = PolyCommitTree::<F, 1>::new(log_leaves);
 
         tree.commit_rev_points(inputs[0].values.clone(), inputs[0].width);
         let root: U256 = tree.root().node_hash().as_byte_array().clone();

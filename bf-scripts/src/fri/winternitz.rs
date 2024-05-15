@@ -15,13 +15,9 @@
 // BEAT OUR IMPLEMENTATION AND WIN A CODE GOLF BOUNTY!
 //
 
-use std::marker::PhantomData;
-
-use bitcoin::script::ScriptIntError;
 pub use bitcoin_script::{define_pushable, script};
 
 pub use crate::execute_script;
-use crate::BfField;
 
 define_pushable!();
 use bitcoin::hashes::{hash160, Hash};
@@ -41,7 +37,7 @@ use hex::decode as hex_decode;
 
 /// Bits per digit
 pub const LOG_D: u32 = 4;
-pub const LOG_D_usize: usize = 4;
+pub const LOG_D_USIZE: usize = 4;
 /// Digits are base d+1
 pub const DIGITS: u32 = (1 << LOG_D) - 1;
 /// Number of digits of the message (8x15=120 checksum need 7bits(2 digits))
@@ -302,7 +298,7 @@ pub fn to_digits(mut number: u32, digit_count: usize) -> Vec<u8> {
 // The equivocation script is anyone can prove that the prover reveal two valid signatures
 // The input of this function is two signatures and the script uses to check these signatures whether all valid.
 // So we need to force these two signature is different
-pub fn equivocation(pub_key: &[Vec<u8>]) -> Script {
+pub fn equivocation(_pub_key: &[Vec<u8>]) -> Script {
     script! {}
 }
 

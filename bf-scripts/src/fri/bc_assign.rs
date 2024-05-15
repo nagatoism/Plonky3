@@ -1,15 +1,10 @@
 use std::collections::HashMap;
 
 use itertools::Itertools;
-use p3_baby_bear::BabyBear;
-use p3_field::extension::BinomialExtensionField;
 
 use crate::bit_comm::BitCommitment;
 use crate::bit_comm_u32::BitCommitmentU32;
 use crate::BfField;
-// static BC_ASSIGN: Lazy<Mutex<BCAssignment<BabyBear>>> = Lazy::new(|| {
-//     Mutex::new(BCAssignment::<BabyBear>::new())
-// });
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct BCAssignment {

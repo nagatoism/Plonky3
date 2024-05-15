@@ -1,11 +1,10 @@
 use alloc::vec;
 use alloc::vec::Vec;
 
-use bf_scripts::{execute_script, execute_script_with_inputs, BfField, Point};
+use bf_scripts::{execute_script_with_inputs, BfField, Point, PointsLeaf};
 use bitcoin::taproot::TapLeaf;
 use itertools::izip;
 use p3_challenger::{BfGrindingChallenger, CanObserve, CanSample};
-use p3_field::{Field, TwoAdicField};
 use p3_util::reverse_bits_len;
 
 use crate::bf_mmcs::BFMmcs;
@@ -64,17 +63,12 @@ where
         betas,
     })
 }
-pub struct OpeningData<F: TwoAdicField> {
-    leaf_index: usize,
-    value: F,
-    sibling_leaf_index: usize,
-    sibling_value: F,
-}
+
 pub fn verify_challenges<F, M, Witness>(
     config: &FriConfig<M>,
     proof: &FriProof<F, M, Witness>,
     challenges: &FriChallenges<F>,
-    reduced_openings: &[[F ; 32]],
+    reduced_openings: &[[F; 32]],
 ) -> Result<(), FriError<M::Error>>
 where
     F: BfField,
@@ -118,8 +112,6 @@ where
     M: BFMmcs<F, Proof = BfCommitPhaseProofStep<F>>,
 {
     let mut folded_eval = F::zero();
-    let mut x = F::zero();
-    let mut neg_x = F::zero();
 
     let mut x = F::two_adic_generator(log_max_height)
         .exp_u64(reverse_bits_len(index, log_max_height) as u64);
@@ -133,18 +125,21 @@ where
         let index_sibling = index ^ 1;
         let index_pair = index >> 1;
 
-        let challenge_point :Point<F> = step.leaf.get_point_by_index(index).unwrap().clone();
-        if log_folded_height < log_max_height-1 {
+        let poins_leaf: PointsLeaf<F> = step.points_leaf.clone();
+        let challenge_point: Point<F> = poins_leaf.get_point_by_index(index).unwrap().clone();
+        if log_folded_height < log_max_height - 1 {
             assert_eq!(folded_eval, challenge_point.y);
         }
-        let sibling_point :Point<F>= step.leaf.get_point_by_index(index_sibling).unwrap().clone();
-        
+        let sibling_point: Point<F> = poins_leaf
+            .get_point_by_index(index_sibling)
+            .unwrap()
+            .clone();
+
         // let opening = reduced_openings[log_folded_height + 1];
 
         assert_eq!(challenge_point.x, x);
-        neg_x = x * F::two_adic_generator(1);
-        assert_eq!(sibling_point.x,neg_x);
-    
+        let neg_x = x * F::two_adic_generator(1);
+        assert_eq!(sibling_point.x, neg_x);
 
         let mut evals = vec![challenge_point.y; 2];
         evals[index_sibling % 2] = sibling_point.y;
@@ -152,10 +147,14 @@ where
         let mut xs = vec![x; 2];
         xs[index_sibling % 2] = neg_x;
 
-        let input = step.leaf.signature();
-        if let TapLeaf::Script(script, _ver) = step.leaf_node.clone() {
-            // Todo: Execute the script with input
-            let res = execute_script_with_inputs(script,input);
+        let input = poins_leaf.signature();
+        if let TapLeaf::Script(script, _ver) = step.leaf_node.leaf().clone() {
+            // todo: check script
+            // assert_eq!(script,poins_leaf.recover_points_euqal_to_commited_point());
+            let res = execute_script_with_inputs(
+                poins_leaf.recover_points_euqal_to_commited_point(),
+                input,
+            );
             assert_eq!(res.success, true);
         } else {
             panic!("Invalid script")
