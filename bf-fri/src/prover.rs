@@ -135,6 +135,7 @@ struct CommitPhaseResult<F: Send + Sync, M: BFMmcs<F>> {
 mod tests {
 
     use bf_scripts::BabyBear;
+    use itertools::Itertools;
     use p3_challenger::BfChallenger;
     use p3_dft::{Radix2Dit, TwoAdicSubgroupDft};
     use p3_field::{AbstractField, U32};

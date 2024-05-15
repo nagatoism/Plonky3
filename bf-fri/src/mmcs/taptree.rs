@@ -335,7 +335,12 @@ impl<F: BfField> Polynomials<F> {
 
 mod tests {
 
+    use bf_scripts::BabyBear;
     use p3_field::AbstractField;
+    use p3_interpolation::interpolate_subgroup;
+    use p3_matrix::dense::RowMajorMatrix;
+
+    use super::*;
 
     #[test]
     fn test_tree_builder() {

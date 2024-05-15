@@ -104,7 +104,7 @@ fn verify_query<F, M>(
     mut index: usize,
     proof: &BfQueryProof<F>,
     betas: &[F],
-    reduced_openings: &[F; 32],
+    _reduced_openings: &[F; 32],
     log_max_height: usize,
 ) -> Result<F, FriError<M::Error>>
 where
