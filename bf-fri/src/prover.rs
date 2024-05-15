@@ -136,7 +136,7 @@ mod tests {
 
     use bf_scripts::BabyBear;
     use itertools::Itertools;
-    use p3_challenger::BfChallenger;
+    use p3_challenger::{BfChallenger,CanSampleBits};
     use p3_dft::{Radix2Dit, TwoAdicSubgroupDft};
     use p3_field::{AbstractField, U32};
     use p3_matrix::util::reverse_matrix_index_bits;
@@ -175,7 +175,7 @@ mod tests {
     type MyFriConfig = FriConfig<ValMmcs>;
 
     #[test]
-    fn test_commit_phase() {
+    fn test_compelte_fri_process() {
         let permutation = TestPermutation {};
         let mut challenger =
             BfChallenger::<F, PF, TestPermutation, WIDTH>::new(permutation).unwrap();
@@ -224,6 +224,7 @@ mod tests {
         });
 
         let (proof, idxs) = bf_prove(&fri_config, &input, &mut challenger);
+        let p_sample =  challenger.sample_bits(8);
 
         let log_max_height = input.iter().rposition(Option::is_some).unwrap();
         let reduced_openings: Vec<[BabyBear; 32]> = idxs
@@ -256,10 +257,10 @@ mod tests {
         verifier::verify_challenges(&fri_config, &proof, &fri_challenges, &reduced_openings)
             .expect("failed verify challenges");
 
-        // assert_eq!(
-        //     p_sample,
-        //     v_challenger.sample_bits(8),
-        //     "prover and verifier transcript have same state after FRI"
-        // );
+        assert_eq!(
+            p_sample,
+            v_challenger.sample_bits(8),
+            "prover and verifier transcript have same state after FRI"
+        );
     }
 }
