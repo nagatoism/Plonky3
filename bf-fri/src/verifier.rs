@@ -104,7 +104,7 @@ fn verify_query<F, M>(
     mut index: usize,
     proof: &BfQueryProof<F>,
     betas: &[F],
-    _reduced_openings: &[F; 32],
+    reduced_openings: &[F; 32],
     log_max_height: usize,
 ) -> Result<F, FriError<M::Error>>
 where
@@ -127,6 +127,10 @@ where
 
         let poins_leaf: PointsLeaf<F> = step.points_leaf.clone();
         let challenge_point: Point<F> = poins_leaf.get_point_by_index(index).unwrap().clone();
+
+        let opening = reduced_openings[log_folded_height + 1];
+        folded_eval = opening + folded_eval;
+
         if log_folded_height < log_max_height - 1 {
             assert_eq!(folded_eval, challenge_point.y);
         }
@@ -135,13 +139,11 @@ where
             .unwrap()
             .clone();
 
-        // let opening = reduced_openings[log_folded_height + 1];
-
         assert_eq!(challenge_point.x, x);
         let neg_x = x * F::two_adic_generator(1);
         assert_eq!(sibling_point.x, neg_x);
 
-        let mut evals = vec![challenge_point.y; 2];
+        let mut evals = vec![folded_eval; 2];
         evals[index_sibling % 2] = sibling_point.y;
 
         let mut xs = vec![x; 2];

@@ -2,6 +2,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use bf_scripts::BfField;
+use itertools::Itertools;
 use p3_challenger::{BfGrindingChallenger, CanObserve, CanSample};
 use p3_field::TwoAdicField;
 use p3_matrix::dense::RowMajorMatrix;
@@ -106,9 +107,9 @@ where
         let beta: F = challenger.sample();
         current = fold_even_odd(current, beta);
 
-        // if let Some(v) = &input[log_folded_height] {
-        //     current.iter_mut().zip_eq(v).for_each(|(c, v)| *c += *v);
-        // }
+        if let Some(v) = &input[log_folded_height] {
+            current.iter_mut().zip_eq(v).for_each(|(c, v)| *c += *v);
+        }
     }
 
     // We should be left with `blowup` evaluations of a constant polynomial.
@@ -136,7 +137,7 @@ mod tests {
 
     use bf_scripts::BabyBear;
     use itertools::Itertools;
-    use p3_challenger::{BfChallenger,CanSampleBits};
+    use p3_challenger::{BfChallenger, CanSampleBits};
     use p3_dft::{Radix2Dit, TwoAdicSubgroupDft};
     use p3_field::{AbstractField, U32};
     use p3_matrix::util::reverse_matrix_index_bits;
@@ -192,7 +193,7 @@ mod tests {
         let shift = Val::generator();
         let mut rng = ChaCha20Rng::seed_from_u64(0);
 
-        let ldes: Vec<RowMajorMatrix<Val>> = (9..10)
+        let ldes: Vec<RowMajorMatrix<Val>> = (1..10)
             .map(|deg_bits| {
                 let evals = RowMajorMatrix::<Val>::rand_nonzero(&mut rng, 1 << deg_bits, 1);
                 let mut lde = dft.coset_lde_batch(evals, 1, shift);
@@ -224,7 +225,7 @@ mod tests {
         });
 
         let (proof, idxs) = bf_prove(&fri_config, &input, &mut challenger);
-        let p_sample =  challenger.sample_bits(8);
+        let p_sample = challenger.sample_bits(8);
 
         let log_max_height = input.iter().rposition(Option::is_some).unwrap();
         let reduced_openings: Vec<[BabyBear; 32]> = idxs
