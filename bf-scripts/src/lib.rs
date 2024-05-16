@@ -2,7 +2,8 @@
 use bitcoin::blockdata::transaction;
 use bitcoin::blockdata::transaction::Transaction;
 use bitcoin::hashes::Hash;
-use bitcoin::TapLeafHash;
+// use bitcoin::TapLeafHash;
+use bitcoin::taproot::TapLeafHash;
 use bitcoin_script::define_pushable;
 use bitcoin_scriptexec::{Exec, ExecCtx, ExecutionResult, Options, TxTemplate};
 mod u31;

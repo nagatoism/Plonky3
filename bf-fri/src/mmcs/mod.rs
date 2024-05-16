@@ -1,3 +1,5 @@
+#![feature(slice_pattern)]
+
 pub mod bf_mmcs;
 pub mod extension_mmcs;
 pub mod taptree;

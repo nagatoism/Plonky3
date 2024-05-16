@@ -11,8 +11,8 @@ use p3_util::{log2_strict_usize, reverse_slice_index_bits};
 
 use crate::error::BfError;
 
-pub fn combine_two_nodes(a: NodeInfo, b: NodeInfo) -> Result<NodeInfo, BfError> {
-    let parent = NodeInfo::combine(a, b)?;
+pub fn combine_two_nodes(a: NodeInfo, b: NodeInfo) -> Result<(NodeInfo, bool), BfError> {
+    let parent = NodeInfo::combine_with_order(a, b)?;
     Ok(parent)
 }
 
@@ -122,6 +122,7 @@ pub struct BasicTree<const NUM_POLY: usize> {
     root_node: Option<NodeInfo>,
     leaf_count: u64,
     tree_builder: Option<TreeBuilder>,
+    leaf_indexs: Vec<u64>,
 }
 
 impl<const NUM_POLY: usize> BasicTree<NUM_POLY> {
@@ -130,10 +131,12 @@ impl<const NUM_POLY: usize> BasicTree<NUM_POLY> {
             root_node: None,
             leaf_count: 0,
             tree_builder: Some(TreeBuilder::new(log_poly_points)),
+            leaf_indexs: Vec::new(),
         }
     }
 
     pub fn add_leaf(&mut self, leaf_script: ScriptBuf) {
+        self.leaf_indexs.push(self.leaf_count as u64);
         self.leaf_count += 1;
         self.mut_tree_builder().add_leaf(leaf_script);
     }
@@ -167,17 +170,35 @@ impl<const NUM_POLY: usize> BasicTree<NUM_POLY> {
         builder
     }
 
-    pub fn combine_tree<const NEXT_LOG_POLY_POINTS: usize>(self, other: Self) -> Self {
-        let combined_tree = combine_two_nodes(self.root().clone(), other.root().clone()).unwrap();
+    // This function only support combine trees with same depth
+    pub fn combine_tree(&mut self, other: &mut Self) -> Self {
+        let (combined_tree, noswap) =
+            combine_two_nodes(self.root().clone(), other.root().clone()).unwrap();
+        let mut leaf_indexs: Vec<u64> = Vec::new();
+        if !noswap {
+            other.leaf_indexs.append(&mut self.leaf_indexs);
+            leaf_indexs = other.leaf_indexs.clone();
+        } else {
+            self.leaf_indexs.append(&mut other.leaf_indexs);
+            leaf_indexs = self.leaf_indexs.clone();
+        }
+        assert_eq!(
+            leaf_indexs.len(),
+            self.leaf_count() as usize + other.leaf_count() as usize
+        );
         Self {
             root_node: Some(combined_tree),
             leaf_count: self.leaf_count() + other.leaf_count(),
             tree_builder: None,
+            leaf_indexs: leaf_indexs,
         }
     }
 
     pub fn finalize(&mut self) {
-        self.root_node = Some(self.tree_builder.as_mut().unwrap().root());
+        let (new_root_node, new_leaf_indexes) =
+            self.tree_builder.as_mut().unwrap().root_and_leaf_order();
+        self.root_node = Some(new_root_node);
+        self.leaf_indexs = new_leaf_indexes;
         self.tree_builder = None;
     }
 
@@ -192,6 +213,7 @@ impl<const NUM_POLY: usize> BasicTree<NUM_POLY> {
     }
 
     pub fn get_leaf_merkle_path(&self, index: usize) -> Option<&TaprootMerkleBranch> {
+        let index = self.index_map(index);
         if let Some(leaf) = self.leaves().nth(index) {
             Some(leaf.merkle_branch())
         } else {
@@ -199,11 +221,17 @@ impl<const NUM_POLY: usize> BasicTree<NUM_POLY> {
         }
     }
 
+    fn index_map(&self, index: usize) -> usize {
+        self.leaf_indexs[index] as usize
+    }
+
     pub fn get_leaf(&self, index: usize) -> Option<&LeafNode> {
+        let index = self.index_map(index);
         self.leaves().nth(index)
     }
 
     pub fn verify_inclusion_by_index(&self, index: usize) -> bool {
+        let index = self.index_map(index);
         let leaf = self.get_leaf(index).unwrap();
         let path = self.get_leaf_merkle_path(index).unwrap();
         let mut first_node_hash = TapNodeHash::from_node_hashes(leaf.node_hash(), path[0]);
@@ -221,6 +249,7 @@ impl<const NUM_POLY: usize> From<NodeInfo> for BasicTree<NUM_POLY> {
             root_node: Some(value),
             leaf_count: 0,
             tree_builder: None,
+            leaf_indexs: Vec::new(),
         }
     }
 }
@@ -277,40 +306,47 @@ impl TreeBuilder {
         self.leaves.truncate(nodes_len / 2);
     }
 
-    pub fn root_and_leaf_order(&mut self) -> NodeInfo {
+    pub fn root_and_leaf_order(&mut self) -> (NodeInfo, Vec<u64>) {
         let mut order = Vec::new();
+
         let nodes_len = self.leaves.len();
-        for i in 0..nodes_len{
-            order.push(i);
+        for i in 0..nodes_len {
+            order.push(i as u64);
         }
 
         assert!(self.leaves.len() as u32 == 2u32.pow(self.log_leaves as u32));
         for i in 0..self.log_leaves {
-            self.build_layer_with_order((self.log_leaves - i) as u32,&mut order);
+            order = self.build_layer_with_order((self.log_leaves - i) as u32, order);
         }
         assert!(self.leaves.len() == 1);
-        self.leaves[0].clone()
+        (self.leaves[0].clone(), order)
     }
 
-    fn build_layer_with_order(&mut self, depth: u32, &mut order:&mut Vec<usize>){
-        let chunk_size:usize = 1 << (self.log_leaves - depth as usize);
-        let left_first = false;
+    fn build_layer_with_order(&mut self, depth: u32, mut order: Vec<u64>) -> Vec<u64> {
+        let chunk_size: usize = 1 << (self.log_leaves as u64 - depth as u64);
+        let mut left_first = false;
         let nodes_len = self.leaves.len();
         assert!(nodes_len as u32 == 2u32.pow(depth));
         for i in (0..nodes_len).step_by(2) {
-            (self.leaves[i / 2],left_first) =
-                NodeInfo::combine_with_order(self.leaves[i].clone(), self.leaves[i + 1].clone()).unwrap();
-            if !left_first{
+            (self.leaves[i / 2], left_first) =
+                NodeInfo::combine_with_order(self.leaves[i].clone(), self.leaves[i + 1].clone())
+                    .unwrap();
+            if !left_first {
+                // let mut order_rep = order.clone();
                 let start = i * chunk_size;
                 let mid = (i + 1) * chunk_size;
                 let end = (i + 2) * chunk_size;
 
-                order[start..mid].swap_with_slice(&mut order[mid..end]);
+                let temp1 = order[start..mid].to_vec();
+                let temp2 = order[mid..end].to_vec();
+
+                order[start..mid].clone_from_slice(&temp2);
+                order[mid..end].clone_from_slice(&temp1);
             }
         }
         self.leaves.truncate(nodes_len / 2);
+        order
     }
-
 }
 
 #[derive(PartialEq)]
@@ -481,13 +517,21 @@ mod tests {
             assert_eq!(inclusion, true);
         });
 
-        let combined_tree: BasicTree<1> = BasicTree::<1>::from(
-            combine_two_nodes(
-                field_taptree_1.root().clone(),
-                field_taptree_2.root().clone(),
-            )
-            .unwrap(),
-        );
+        (0..8).into_iter().for_each(|index| {
+            let inclusion = field_taptree_1.verify_inclusion_by_index(index);
+            assert_eq!(inclusion, true);
+        });
+
+        // let (combined,_) =  combine_two_nodes(
+        //     field_taptree_1.root().clone(),
+        //     field_taptree_2.root().clone(),
+        // )
+        // .unwrap();
+        // let combined_tree: BasicTree<1> = BasicTree::<1>::from(
+        //     combined
+        // );
+
+        let combined_tree = field_taptree_1.combine_tree(&mut field_taptree_2);
 
         (0..8).into_iter().for_each(|index| {
             let inclusion = combined_tree.verify_inclusion_by_index(index);
@@ -531,20 +575,31 @@ mod tests {
 
         let mut poly_taptree = PolyCommitTree::<BabyBear, 1>::new(2);
 
-        poly_taptree.commit_rev_points(evas1.clone(),2);
+        poly_taptree.commit_rev_points(evas1.clone(), 2);
 
         (0..4).into_iter().for_each(|index| {
             let leaf = poly_taptree.get_leaf(index).unwrap();
             let script = leaf.leaf().as_script().unwrap();
             let points_leaf = poly_taptree.get_points_leaf(index);
-            assert_eq!(points_leaf.recover_points_euqal_to_commited_point(),*script.0);
-            let success = verify_inclusion(
-                poly_taptree.root().node_hash(),
-                leaf,
+            assert_eq!(
+                points_leaf.recover_points_euqal_to_commited_point(),
+                *script.0
             );
+            let success = verify_inclusion(poly_taptree.root().node_hash(), leaf);
             assert_eq!(success, true);
         });
+    }
 
+    #[test]
+    fn test_swap_slice() {
+        let mut values = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
+        let temp1 = values[2..4].to_vec();
+        let temp2 = values[6..8].to_vec();
+
+        values[2..4].clone_from_slice(&temp2);
+        values[6..8].clone_from_slice(&temp1);
+
+        println!("{:?}", values);
     }
 }

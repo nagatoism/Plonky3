@@ -179,7 +179,6 @@ where
     Ok(folded_eval)
 }
 
-
 pub fn bf_verify_challenges<F, M, Witness>(
     config: &FriConfig<M>,
     proof: &FriProof<F, M, Witness>,
@@ -268,7 +267,7 @@ where
         let input = poins_leaf.signature();
         if let TapLeaf::Script(script, _ver) = step.leaf_node.leaf().clone() {
             // todo: check script
-            // assert_eq!(script,poins_leaf.recover_points_euqal_to_commited_point());
+            assert_eq!(script,poins_leaf.recover_points_euqal_to_commited_point());
             let res = execute_script_with_inputs(
                 poins_leaf.recover_points_euqal_to_commited_point(),
                 input,

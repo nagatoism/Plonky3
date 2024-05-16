@@ -4,18 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bitcoin-script = { git = "https://github.com/cyl19970726/rust-bitcoin-script", branch = "script_macro" }
-bitcoin = { git = "https://github.com/cyl19970726/rust-bitcoin", branch = "merge" }
-# bitcoin = { path = "../../../bitvm/rust-bitcoin/bitcoin"}
-bitcoin-scriptexec = { git = "https://github.com/cyl19970726/rust-bitcoin-scriptexec" }
+bitcoin-script = { git = "https://github.com/cyl19970726/rust-bitcoin-script", rev = "eda97c5" }
+bitcoin = { git = "https://github.com/cyl19970726/rust-bitcoin", rev = "ffad6f3" }
+bitcoin-scriptexec = { git = "https://github.com/cyl19970726/rust-bitcoin-scriptexec",rev = "09c601e" }
 
 rand_chacha = "0.3.1"
 rand = "0.8.5"
 p3-field = { path = "../field" }
 p3-baby-bear = { path = "../baby-bear" }
-# p3-baby-bear = { git = "https://github.com/Plonky3/Plonky3" }
-# p3-field = { git = "https://github.com/Plonky3/Plonky3" }
-# p3-mersenne-31 = { git = "https://github.com/Plonky3/Plonky3" }
 once_cell = "1.8.0"
 hex = "0.4.3"
 itertools = "0.12.1"
@@ -23,7 +19,7 @@ itertools = "0.12.1"
 p3-dft = { path = "../dft" }
 p3-goldilocks = { path = "../goldilocks" }
 p3-mersenne-31 = { path = "../mersenne-31" }
-p3-mds = { path = "../mds" }
+p3-mds = { path = "../mds" } 
 p3-merkle-tree = { path = "../merkle-tree" }
 p3-poseidon2 = { path = "../poseidon2" }
 p3-symmetric = { path = "../symmetric" }
