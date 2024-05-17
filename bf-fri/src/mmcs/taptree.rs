@@ -396,16 +396,16 @@ mod tests {
     #[test]
     fn test_tree_builder() {
         type F = BabyBear;
-        
-        let mut coeffs1: Vec<F> = Vec::with_capacity(2u32.pow(DEPTH as u32) as usize);
-        for i in 0..2u32.pow(DEPTH as u32) {
+        let depth = 3;
+        let mut coeffs1: Vec<F> = Vec::with_capacity(2u32.pow(depth as u32) as usize);
+        for i in 0..2u32.pow(depth as u32) {
             coeffs1.push(F::from_canonical_u32(i));
         }
         let poly1 = Polynomials::new(coeffs1, PolynomialType::Coeff);
         let eva_poly1 = poly1.convert_to_evals_at_subgroup();
         let evas1 = eva_poly1.values();
 
-        let mut tb = TreeBuilder::new();
+        let mut tb = TreeBuilder::<3>::new();
 
         for i in 0..evas1.len() {
             let leaf_script = construct_evaluation_leaf_script::<1, F>(
@@ -417,7 +417,7 @@ mod tests {
             tb.add_leaf(leaf_script);
         }
 
-        let root_node = tb.root();
+        let tree =tb.build_tree();
         // assert!(root_node.leaf_nodes().len()==8);
     }
     #[test]
@@ -445,7 +445,7 @@ mod tests {
         let evas1 = eva_poly1.values();
 
         let mut field_taptree_1 = PolyCommitTree::<BabyBear, 1>::new(2);
-
+        let mut tb_1 = TreeBuilder::<1>::new();
         for i in 0..evas1.len() {
             let leaf_script = construct_evaluation_leaf_script::<1, F>(
                 i,
@@ -453,9 +453,9 @@ mod tests {
                 vec![evas1[i].clone()],
             )
             .unwrap();
-            field_taptree_1.tree.add_leaf(leaf_script);
+            field_taptree_1.add_leaf(&mut tb_1,leaf_script);
         }
-
+        field_taptree_1.tree=tb_1.build_tree();
         let coeffs2: Vec<BabyBear> = vec![
             BabyBear::from_canonical_u32(4),
             BabyBear::from_canonical_u32(3),
@@ -467,7 +467,7 @@ mod tests {
         let evas2 = eva_poly2.values();
         assert!(evas2.len() == 4);
 
-        field_taptree_1.finalize();
+       
 
         (0..4).into_iter().for_each(|index| {
             let inclusion = field_taptree_1.verify_inclusion_by_index(index);
@@ -480,7 +480,7 @@ mod tests {
         });
 
         let mut field_taptree_2 = PolyCommitTree::<BabyBear, 1>::new(2);
-
+        let mut tb_2 = TreeBuilder::<1>::new();
         for i in 0..evas2.len() {
             let leaf_script = construct_evaluation_leaf_script::<1, F>(
                 i,
@@ -488,10 +488,10 @@ mod tests {
                 vec![evas2[i].clone()],
             )
             .unwrap();
-            field_taptree_2.tree.add_leaf(leaf_script);
+            field_taptree_2.add_leaf(&mut tb_2, leaf_script);
         }
-
-        field_taptree_2.finalize();
+        
+        field_taptree_2.tree=tb_2.build_tree();
         (0..4).into_iter().for_each(|index| {
             let inclusion = field_taptree_2.verify_inclusion_by_index(index);
             assert_eq!(inclusion, true);
@@ -511,7 +511,7 @@ mod tests {
         //     combined
         // );
 
-        let combined_tree = field_taptree_1.combine_tree(&mut field_taptree_2);
+        let combined_tree = combine_two_nodes(field_taptree_1.root_node.unwrap(),field_taptree_2.root_node.unwrap());
 
         (0..8).into_iter().for_each(|index| {
             let inclusion = combined_tree.verify_inclusion_by_index(index);
