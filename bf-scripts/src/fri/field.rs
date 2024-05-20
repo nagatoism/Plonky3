@@ -64,6 +64,11 @@ impl BfField for BinomialExtensionField<BabyBear, 4> {
 }
 
 mod tests {
+    use p3_baby_bear::BabyBear;
+    use p3_field::AbstractField;
+    use p3_field::PrimeField32;
+    use crate::BfField;
+
     #[test]
     fn test_subgroup() {
         let generator = BabyBear::group_genreator(2);

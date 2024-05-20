@@ -39,7 +39,7 @@ impl<F: BfField> BFMmcs<F> for TapTreeMmcs<F> {
     fn open_taptree(&self, index: usize, prover_data: &PolyCommitTree<F, 1>) -> Self::Proof {
         // The matrix with width-2 lead to the index need to right shift 1-bit
         let leaf_index = index >> LOG_DEFAULT_MATRIX_WIDTH;
-        let leaf = prover_data.get_leaf(leaf_index);
+        let leaf = prover_data.get_tapleaf(leaf_index);
         let opening_leaf = match leaf {
             Some(v) => v,
             None => {

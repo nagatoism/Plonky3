@@ -171,7 +171,7 @@ impl<const NUM_POLY: usize> TreeBuilder<NUM_POLY> {
             for (a, b) in node_tuples {
                 let a_leaf_size = a.leaf_nodes().len();
                 let a_end_idx = a_start_idx + a_leaf_size;
-                let b_start_idx = a_end_idx + 1;
+                let b_start_idx = a_end_idx;
                 let b_leaf_size = b.leaf_nodes().len();
                 let b_end_idx = b_start_idx + b_leaf_size;
                 let (ret_node, left_first) = NodeInfo::combine_with_order(a, b).unwrap();
@@ -188,7 +188,7 @@ impl<const NUM_POLY: usize> TreeBuilder<NUM_POLY> {
                     temp_b_leaf_indices
                         .as_mut_slice()
                         .copy_from_slice(&t_idx_to_m_idx[b_start_idx..b_end_idx]);
-
+                    temp_b_leaf_indices.append(&mut temp_a_leaf_indices);
                     t_idx_to_m_idx[a_start_idx..b_end_idx]
                         .copy_from_slice(&temp_b_leaf_indices.as_slice());
                 }
